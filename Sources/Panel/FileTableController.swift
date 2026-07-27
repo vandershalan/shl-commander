@@ -100,6 +100,8 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
     var entries: [FileEntry] = []
     var listingID: UUID?
     var marks: Set<URL> = []
+    var directorySizes: [URL: Int64] = [:]
+    var measuringDirectories: Set<URL> = []
 
     var onCursorChange: (Int) -> Void = { _ in }
     var onOpen: () -> Void = {}
@@ -146,7 +148,11 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
         case .ext:
             cell.textField?.stringValue = entry.ext
         case .size:
-            cell.textField?.stringValue = Formatters.sizeColumn(for: entry)
+            cell.textField?.stringValue = Formatters.sizeColumn(
+                for: entry,
+                directorySize: directorySizes[entry.url],
+                measuring: measuringDirectories.contains(entry.url)
+            )
         case .date:
             cell.textField?.stringValue = Formatters.dateColumn(for: entry)
         }

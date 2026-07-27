@@ -19,6 +19,8 @@ struct PanelView: View {
                 listingID: panel.listingID,
                 cursor: panel.cursor,
                 marks: panel.marks,
+                directorySizes: panel.sizer.sizes,
+                measuringDirectories: panel.measuringDirectories,
                 sort: panel.sort,
                 isActive: isActive,
                 renameRequestID: panel.renameRequestID,

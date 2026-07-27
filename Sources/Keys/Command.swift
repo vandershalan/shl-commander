@@ -31,6 +31,8 @@ enum Command: String, CaseIterable, Codable, Sendable {
     case sortBySize
     case toggleHidden
     case clearFilter
+    case measureSelectedDirectories
+    case measureAllDirectories
 
     // Marking
     case markToggle
@@ -75,6 +77,8 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .sortBySize: return "Sort by Size"
         case .toggleHidden: return "Show Hidden Files"
         case .clearFilter: return "Clear Filter"
+        case .measureSelectedDirectories: return "Measure Selected Folders"
+        case .measureAllDirectories: return "Measure All Folders"
         case .markToggle: return "Mark"
         case .markToggleAndAdvance: return "Mark and Advance"
         case .markByPattern: return "Mark by Pattern…"
@@ -97,7 +101,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .switchPane, .openCursor, .goUp, .goToVolumeRoot, .historyBack, .historyForward:
             return .go
         case .refresh, .sortByName, .sortByExtension, .sortByDate, .sortBySize, .toggleHidden,
-            .clearFilter:
+            .clearFilter, .measureSelectedDirectories, .measureAllDirectories:
             return .view
         case .markToggle, .markToggleAndAdvance, .markByPattern, .unmarkByPattern, .invertMarks,
             .markAll, .markNone:

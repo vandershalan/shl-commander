@@ -82,6 +82,8 @@ extension Keymap {
         .sortBySize: [chord("ctrl+f6"), chord("cmd+opt+4")],
         .toggleHidden: [chord("ctrl+h"), chord("cmd+shift+period")],
         .clearFilter: [chord("escape")],
+        .measureSelectedDirectories: [chord("ctrl+l"), chord("cmd+l")],
+        .measureAllDirectories: [chord("opt+shift+return"), chord("cmd+shift+l")],
 
         .markToggle: [chord("space")],
         // Most Mac keyboards have no Insert key, so ⇧Space carries the same meaning.

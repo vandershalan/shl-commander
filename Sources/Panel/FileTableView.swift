@@ -11,6 +11,8 @@ struct FileTableView: NSViewRepresentable {
     let listingID: UUID
     let cursor: Int
     let marks: Set<URL>
+    let directorySizes: [URL: Int64]
+    let measuringDirectories: Set<URL>
     let sort: SortOrder
     /// Drives first-responder handoff between the two panes.
     let isActive: Bool
@@ -89,10 +91,17 @@ struct FileTableView: NSViewRepresentable {
             controller.listingID = listingID
             controller.entries = entries
             controller.marks = marks
+            controller.directorySizes = directorySizes
+            controller.measuringDirectories = measuringDirectories
             table.reloadData()
-        } else if controller.marks != marks {
-            // Marks repaint in place; the row set has not changed.
+        } else if controller.marks != marks
+            || controller.directorySizes != directorySizes
+            || controller.measuringDirectories != measuringDirectories
+        {
+            // Marks and sizes repaint in place; the row set has not changed.
             controller.marks = marks
+            controller.directorySizes = directorySizes
+            controller.measuringDirectories = measuringDirectories
             table.reloadData(
                 forRowIndexes: IndexSet(entries.indices),
                 columnIndexes: IndexSet(integersIn: 0..<table.numberOfColumns)

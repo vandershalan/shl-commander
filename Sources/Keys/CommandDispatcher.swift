@@ -60,9 +60,18 @@ struct CommandDispatcher {
             state.right.showHidden = showing
         case .clearFilter:
             panel.filter = ""
+        case .measureSelectedDirectories:
+            panel.measureSelectedDirectories()
+        case .measureAllDirectories:
+            panel.measureAllDirectories()
 
         // Marking
         case .markToggle:
+            // Total Commander also measures a folder when you mark it with Space, which is
+            // the quickest way to size one directory.
+            if let entry = panel.cursorEntry, entry.isDirectory, !entry.isParent {
+                panel.sizer.request([entry])
+            }
             panel.toggleMarkAtCursor(advance: false)
         case .markToggleAndAdvance:
             panel.toggleMarkAtCursor(advance: true)

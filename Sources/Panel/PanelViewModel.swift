@@ -83,12 +83,40 @@ final class PanelViewModel: Identifiable {
     /// Recreated on every directory change; nil when the OS refused a stream.
     private var watcher: FSEventsWatcher?
 
+    /// Measured directory sizes for this pane. Per-pane rather than shared: the panes usually
+    /// show different directories, and a shared instance would need to fan updates out to both.
+    let sizer = DirectorySizer()
+
     init(directory: URL = FileManager.default.homeDirectoryForCurrentUser) {
         // Standardised on the way in so `enter` never sees two spellings of one directory.
         // Symlinks are deliberately left unresolved: the panel shows the path the user asked
         // for, not wherever it happens to point.
         self.directory = directory.standardizedFileURL
+        sizer.onUpdate = { [weak self] in self?.directorySizesChanged() }
     }
+
+    /// Sizes arriving change what the Size column shows, and can change the order when sorting
+    /// by size.
+    private func directorySizesChanged() {
+        if sort.key == .size {
+            resort()
+        } else {
+            listingID = UUID()
+        }
+    }
+
+    /// Measures the marked directories, or the cursor directory when nothing is marked.
+    func measureSelectedDirectories() {
+        sizer.request(actionTargets.filter(\.isDirectory))
+    }
+
+    /// Measures every directory in the pane.
+    func measureAllDirectories() {
+        sizer.request(entries)
+    }
+
+    /// Directories currently being measured, so their Size cell can show progress.
+    var measuringDirectories: Set<URL> { sizer.pendingURLs }
 
     var cursorEntry: FileEntry? {
         entries.indices.contains(cursor) ? entries[cursor] : nil
@@ -336,12 +364,14 @@ final class PanelViewModel: Identifiable {
             .flatMap(\.volumeAvailableCapacity).map(Int64.init)
         switch outcome {
         case .listed(let children):
-            var rows = sort.sorted(children)
+            var rows = sort.sorted(children, directorySizes: sizer.sizes)
             if let up = DirectoryLister.parent(of: directory) {
                 rows.insert(.parent(up), at: 0)
             }
             allEntries = rows
             loadError = nil
+            // Fresh timestamps are in hand, so any size measured before a change goes away.
+            sizer.prune(against: rows)
             // Drop marks for anything that no longer exists.
             marks.formIntersection(Set(rows.map(\.url)))
             rebuildVisible(keeping: name)
@@ -356,7 +386,10 @@ final class PanelViewModel: Identifiable {
     private func resort() {
         let name = cursorEntry?.name
         let parentRow = allEntries.first(where: \.isParent)
-        var rows = sort.sorted(allEntries.filter { !$0.isParent })
+        var rows = sort.sorted(
+            allEntries.filter { !$0.isParent },
+            directorySizes: sizer.sizes
+        )
         if let parentRow { rows.insert(parentRow, at: 0) }
         allEntries = rows
         rebuildVisible(keeping: name)

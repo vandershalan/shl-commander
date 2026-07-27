@@ -26,12 +26,13 @@ enum Formatters {
         byteCount.string(fromByteCount: bytes)
     }
 
-    /// What the Size column shows for a row. Directories read `<DIR>` until step 6's
-    /// sizer fills them in.
-    static func sizeColumn(for entry: FileEntry) -> String {
+    /// What the Size column shows for a row. A directory reads `<DIR>` until it has been
+    /// measured, and `…` while it is being measured.
+    static func sizeColumn(for entry: FileEntry, directorySize: Int64?, measuring: Bool) -> String {
         if entry.isParent { return "<UP>" }
-        if entry.isDirectory { return "<DIR>" }
-        return size(entry.size)
+        guard entry.isDirectory else { return size(entry.size) }
+        if let directorySize { return size(directorySize) }
+        return measuring ? "…" : "<DIR>"
     }
 
     static func dateColumn(for entry: FileEntry) -> String {
