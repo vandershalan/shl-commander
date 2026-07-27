@@ -10,11 +10,16 @@ struct FileTableView: NSViewRepresentable {
     let entries: [FileEntry]
     let listingID: UUID
     let cursor: Int
+    let marks: Set<URL>
     let sort: SortOrder
+    /// Drives first-responder handoff between the two panes.
+    let isActive: Bool
 
     let onCursorChange: (Int) -> Void
+    let onMove: (CursorMove) -> Void
     let onOpen: () -> Void
     let onSort: (SortKey, Bool) -> Void
+    let onActivate: () -> Void
     let onKeyDown: (NSEvent) -> Bool
 
     func makeCoordinator() -> FileTableController { FileTableController() }
@@ -30,6 +35,9 @@ struct FileTableView: NSViewRepresentable {
         table.allowsColumnResizing = true
         table.allowsMultipleSelection = false
         table.allowsEmptySelection = false
+        // The quick filter replaces AppKit's type-select, which would otherwise swallow the
+        // keystrokes meant for it.
+        table.allowsTypeSelect = false
         table.focusRingType = .none
         // Name is the only flexible column, so slack goes there.
         table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
@@ -70,14 +78,28 @@ struct FileTableView: NSViewRepresentable {
         controller.onOpen = onOpen
         controller.onSort = onSort
         table.keyHandler = onKeyDown
+        table.onMove = onMove
+        table.onBecomeFirstResponder = onActivate
 
         if controller.listingID != listingID {
             controller.listingID = listingID
             controller.entries = entries
+            controller.marks = marks
             table.reloadData()
+        } else if controller.marks != marks {
+            // Marks repaint in place; the row set has not changed.
+            controller.marks = marks
+            table.reloadData(
+                forRowIndexes: IndexSet(entries.indices),
+                columnIndexes: IndexSet(integersIn: 0..<table.numberOfColumns)
+            )
         }
 
         controller.syncSort(sort, on: table)
         controller.syncCursor(cursor, on: table)
+
+        if isActive, table.window?.firstResponder !== table {
+            table.window?.makeFirstResponder(table)
+        }
     }
 }

@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Observation
 
@@ -8,22 +9,34 @@ enum ListingOutcome: Sendable {
     case failed(String)
 }
 
-/// State of one pane: where it is, what it lists, where the cursor sits.
+/// Where the cursor should land after a move.
+enum CursorMove: Sendable {
+    case up, down, top, bottom
+    case pageUp(rows: Int), pageDown(rows: Int)
+}
+
+/// State of one pane: where it is, what it lists, where the cursor sits, what is marked.
 ///
-/// The cursor is deliberately separate from marks (step 2): Total Commander moves the
-/// cursor with the arrows while `Space` marks rows independently.
+/// The cursor is deliberately separate from marks: Total Commander moves the cursor with
+/// the arrows while `Space` and `Insert` mark rows independently of it.
 @MainActor
 @Observable
 final class PanelViewModel: Identifiable {
     let id = UUID()
 
     private(set) var directory: URL
+    /// Everything the directory holds, sorted, including the `..` row.
+    private(set) var allEntries: [FileEntry] = []
+    /// What the table shows — `allEntries` minus anything the quick filter excludes.
     private(set) var entries: [FileEntry] = []
-    /// Bumped on every successful listing or re-sort. The table view reloads only when
-    /// this changes, so cursor moves alone never trigger a full reload.
+    /// Bumped whenever `entries` is replaced. The table reloads only on a change here, so
+    /// cursor moves and mark toggles never trigger a full reload.
     private(set) var listingID = UUID()
     private(set) var loadError: String?
     private(set) var isLoading = false
+
+    /// Marked rows, held by URL so they survive a reload of the same directory.
+    private(set) var marks: Set<URL> = []
 
     var sort: SortOrder = SortOrder() {
         didSet {
@@ -39,6 +52,15 @@ final class PanelViewModel: Identifiable {
         }
     }
 
+    /// Case-insensitive substring match on the name. The `..` row is never filtered out,
+    /// so there is always a way back.
+    var filter: String = "" {
+        didSet {
+            guard filter != oldValue else { return }
+            rebuildVisible(keeping: cursorEntry?.name)
+        }
+    }
+
     /// Index into `entries`, clamped so it can never dangle past the end.
     ///
     /// Clamping happens in the setter, not in a `didSet`: `@Observable` turns stored
@@ -50,7 +72,6 @@ final class PanelViewModel: Identifiable {
     }
 
     private var cursorStorage: Int = 0
-
     private var loadTask: Task<Void, Never>?
 
     init(directory: URL = FileManager.default.homeDirectoryForCurrentUser) {
@@ -61,15 +82,37 @@ final class PanelViewModel: Identifiable {
         entries.indices.contains(cursor) ? entries[cursor] : nil
     }
 
+    // MARK: - Tallies
+
     var fileCount: Int { entries.count(where: { !$0.isDirectory }) }
     var directoryCount: Int { entries.count(where: { $0.isDirectory && !$0.isParent }) }
     var totalBytes: Int64 { entries.reduce(0) { $0 + ($1.isDirectory ? 0 : $1.size) } }
+
+    /// Marked rows in display order. Restricted to what is currently visible so a filtered
+    /// panel never acts on rows the user cannot see.
+    var markedEntries: [FileEntry] { entries.filter { marks.contains($0.url) } }
+    var markedCount: Int { markedEntries.count }
+    var markedBytes: Int64 {
+        markedEntries.reduce(0) { $0 + ($1.isDirectory ? 0 : $1.size) }
+    }
+
+    /// What a command should act on: the marked rows, or the cursor row when nothing is
+    /// marked. This is how every Total Commander file operation picks its targets.
+    var actionTargets: [FileEntry] {
+        let marked = markedEntries
+        if !marked.isEmpty { return marked }
+        guard let entry = cursorEntry, !entry.isParent else { return [] }
+        return [entry]
+    }
+
+    func isMarked(_ entry: FileEntry) -> Bool { marks.contains(entry.url) }
 
     // MARK: - Navigation
 
     /// Enters `url`. The cursor lands on `selecting` when given, otherwise on the first row.
     func navigate(to url: URL, selecting: String? = nil) {
         directory = url.standardizedFileURL
+        filter = ""
         load(keeping: selecting)
     }
 
@@ -93,10 +136,79 @@ final class PanelViewModel: Identifiable {
         guard let up = DirectoryLister.parent(of: directory) else { return }
         let leaving = directory.lastPathComponent
         directory = up
+        filter = ""
         load(keeping: leaving)
     }
 
+    func move(_ move: CursorMove) {
+        switch move {
+        case .up: cursor -= 1
+        case .down: cursor += 1
+        case .top: cursor = 0
+        case .bottom: cursor = entries.count - 1
+        case .pageUp(let rows): cursor -= max(1, rows)
+        case .pageDown(let rows): cursor += max(1, rows)
+        }
+    }
+
+    // MARK: - Marking
+
+    /// Toggles the cursor row. `advance` matches `Insert`, which steps down afterwards so a
+    /// run of files can be marked by holding the key.
+    func toggleMarkAtCursor(advance: Bool) {
+        if let entry = cursorEntry, !entry.isParent {
+            toggleMark(entry)
+        }
+        if advance { cursor += 1 }
+    }
+
+    func toggleMark(_ entry: FileEntry) {
+        guard !entry.isParent else { return }
+        if marks.contains(entry.url) {
+            marks.remove(entry.url)
+        } else {
+            marks.insert(entry.url)
+        }
+    }
+
+    func markAll() {
+        marks = Set(entries.filter { !$0.isParent }.map(\.url))
+    }
+
+    func clearMarks() {
+        marks = []
+    }
+
+    func invertMarks() {
+        let all = Set(entries.filter { !$0.isParent }.map(\.url))
+        marks = all.subtracting(marks)
+    }
+
+    /// Marks or unmarks by shell glob (`*.txt`, `report?.pdf`), the way Total Commander's
+    /// `Num +` / `Num -` do. Uses `fnmatch` so the wildcard semantics are the real ones.
+    func mark(matching pattern: String, marked: Bool) {
+        guard !pattern.isEmpty else { return }
+        for entry in entries where !entry.isParent {
+            guard entry.name.withCString({ name in
+                pattern.withCString { glob in
+                    fnmatch(glob, name, FNM_CASEFOLD) == 0
+                }
+            }) else { continue }
+            if marked {
+                marks.insert(entry.url)
+            } else {
+                marks.remove(entry.url)
+            }
+        }
+    }
+
     // MARK: - Loading
+
+    /// Awaits the in-flight listing. Exists so tests can act on a settled panel instead of
+    /// polling; the app itself never needs to block on a load.
+    func settle() async {
+        await loadTask?.value
+    }
 
     private func load(keeping name: String?) {
         let target = directory
@@ -114,12 +226,6 @@ final class PanelViewModel: Identifiable {
     }
 
     /// `nonisolated async` so it runs on the cooperative pool instead of the main actor.
-    /// Awaits the in-flight listing. Exists so tests can act on a settled panel instead of
-    /// polling; the app itself never needs to block on a load.
-    func settle() async {
-        await loadTask?.value
-    }
-
     private nonisolated static func read(_ url: URL, includeHidden: Bool) async -> ListingOutcome {
         do {
             return .listed(try DirectoryLister.list(url, includeHidden: includeHidden))
@@ -136,30 +242,40 @@ final class PanelViewModel: Identifiable {
             if let up = DirectoryLister.parent(of: directory) {
                 rows.insert(.parent(up), at: 0)
             }
-            entries = rows
-            listingID = UUID()
+            allEntries = rows
             loadError = nil
-            restoreCursor(to: name)
+            // Drop marks for anything that no longer exists.
+            marks.formIntersection(Set(rows.map(\.url)))
+            rebuildVisible(keeping: name)
         case .failed(let message):
-            entries = []
-            listingID = UUID()
-            cursor = 0
+            allEntries = []
+            marks = []
             loadError = message
+            rebuildVisible(keeping: nil)
         }
     }
 
     private func resort() {
         let name = cursorEntry?.name
-        let parentRow = entries.first(where: \.isParent)
-        var rows = sort.sorted(entries.filter { !$0.isParent })
+        let parentRow = allEntries.first(where: \.isParent)
+        var rows = sort.sorted(allEntries.filter { !$0.isParent })
         if let parentRow { rows.insert(parentRow, at: 0) }
-        entries = rows
+        allEntries = rows
+        rebuildVisible(keeping: name)
+    }
+
+    private func rebuildVisible(keeping name: String?) {
+        let needle = filter.lowercased()
+        entries =
+            needle.isEmpty
+            ? allEntries
+            : allEntries.filter { $0.isParent || $0.name.lowercased().contains(needle) }
         listingID = UUID()
         restoreCursor(to: name)
     }
 
-    /// Holds the cursor on the same *name* across reloads and re-sorts; falls back to the
-    /// first row when that name is gone.
+    /// Holds the cursor on the same *name* across reloads, re-sorts, and filter changes;
+    /// falls back to the first row when that name is no longer visible.
     private func restoreCursor(to name: String?) {
         guard let name, let index = entries.firstIndex(where: { $0.name == name }) else {
             cursor = 0
