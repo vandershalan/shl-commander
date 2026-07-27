@@ -193,6 +193,46 @@ final class PanelViewModel: Identifiable {
         }
     }
 
+    // MARK: - Renaming
+
+    /// Bumped to ask the table to open its in-place editor on the cursor row. A counter
+    /// rather than a flag, so consecutive requests are distinguishable.
+    private(set) var renameRequestID: Int = 0
+
+    func requestRename() {
+        guard let entry = cursorEntry, !entry.isParent else { return }
+        renameRequestID += 1
+    }
+
+    /// Commits an edited name. Returns an error message, or nil on success or a no-op.
+    func commitRename(at index: Int, to newName: String) -> String? {
+        guard entries.indices.contains(index) else { return nil }
+        let entry = entries[index]
+        guard !entry.isParent else { return nil }
+
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != entry.name else { return nil }
+        guard !trimmed.contains("/"), !trimmed.contains(":") else {
+            return "A name cannot contain / or :"
+        }
+
+        let target = directory.appendingPathComponent(trimmed)
+        // A case-only change collides with itself on a case-insensitive volume, so it is
+        // allowed through: "readme" to "README" is a rename, not a conflict.
+        let isCaseOnlyChange = trimmed.lowercased() == entry.name.lowercased()
+        if !isCaseOnlyChange, FileManager.default.fileExists(atPath: target.path) {
+            return "\u{22}\(trimmed)\u{22} already exists."
+        }
+
+        do {
+            try FileManager.default.moveItem(at: entry.url, to: target)
+            reload(selecting: trimmed)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     // MARK: - Marking
 
     /// Toggles the cursor row. `advance` matches `Insert`, which steps down afterwards so a

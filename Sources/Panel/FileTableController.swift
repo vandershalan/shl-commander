@@ -50,7 +50,9 @@ final class FileTable: NSTableView {
 /// Data source and delegate for a panel's table. Owns its own copy of the rows so
 /// `numberOfRows` never has to reach back into the view model mid-draw.
 @MainActor
-final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDelegate,
+    NSTextFieldDelegate
+{
     enum ColumnID: String, CaseIterable {
         case name, ext, size, date
 
@@ -102,6 +104,11 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
     var onCursorChange: (Int) -> Void = { _ in }
     var onOpen: () -> Void = {}
     var onSort: (SortKey, Bool) -> Void = { _, _ in }
+    var onRename: (Int, String) -> Void = { _, _ in }
+
+    /// Last rename request the table has acted on, so a bumped counter triggers exactly once.
+    var handledRenameRequest = 0
+    private var editingRow: Int?
 
     /// Guards against the feedback loops that come from pushing state *into* AppKit:
     /// programmatic selection would otherwise report back as a user cursor move, and
@@ -231,6 +238,54 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
 
     @objc func handleDoubleClick(_ sender: Any?) {
         onOpen()
+    }
+
+    // MARK: - In-place rename
+
+    /// Opens the name cell for editing.
+    ///
+    /// Cells are left non-editable normally and flipped only for this one edit, so a stray
+    /// click can never start a rename — a single click has to stay a cursor move.
+    func beginRename(row: Int, on table: NSTableView) {
+        guard entries.indices.contains(row), !entries[row].isParent else { return }
+        guard
+            let cell = table.view(atColumn: 0, row: row, makeIfNecessary: true) as? NSTableCellView,
+            let field = cell.textField
+        else { return }
+
+        editingRow = row
+        field.isEditable = true
+        field.isBordered = true
+        field.drawsBackground = true
+        field.delegate = self
+        table.editColumn(0, row: row, with: nil, select: true)
+
+        // Preselect just the stem, the way the Finder does, so the extension survives typing.
+        let entry = entries[row]
+        if !entry.isDirectory, !entry.ext.isEmpty,
+            let editor = table.window?.fieldEditor(false, for: field) as? NSTextView
+        {
+            let stem = (entry.name as NSString).deletingPathExtension
+            let stemLength = (stem as NSString).length
+            editor.setSelectedRange(NSRange(location: 0, length: stemLength))
+        }
+    }
+
+    func controlTextDidEndEditing(_ notification: Notification) {
+        guard let field = notification.object as? NSTextField, let row = editingRow else { return }
+        editingRow = nil
+        field.isEditable = false
+        field.isBordered = false
+        field.drawsBackground = false
+        field.delegate = nil
+
+        let movement = notification.userInfo?["NSTextMovement"] as? Int
+        guard movement != NSTextMovement.cancel.rawValue else {
+            // Escape reverts, so the cell has to be put back by hand.
+            if entries.indices.contains(row) { field.stringValue = entries[row].name }
+            return
+        }
+        onRename(row, field.stringValue)
     }
 
     // MARK: - Pushing SwiftUI state into AppKit

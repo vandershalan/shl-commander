@@ -21,6 +21,8 @@ struct CommandDispatcher {
             startTransfer(.move)
         case .duplicate:
             duplicate(on: panel)
+        case .renameInPlace:
+            panel.requestRename()
         case .moveToTrash:
             delete(on: panel, toTrash: true)
         case .deletePermanently:

@@ -11,6 +11,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
     case copyToOtherPane
     case moveToOtherPane
     case duplicate
+    case renameInPlace
     case moveToTrash
     case deletePermanently
 
@@ -58,6 +59,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .copyToOtherPane: return "Copy…"
         case .moveToOtherPane: return "Move…"
         case .duplicate: return "Duplicate"
+        case .renameInPlace: return "Rename"
         case .moveToTrash: return "Move to Trash"
         case .deletePermanently: return "Delete Permanently…"
         case .switchPane: return "Switch Pane"
@@ -102,8 +104,9 @@ enum Command: String, CaseIterable, Codable, Sendable {
             return .mark
         case .sendPathToOtherPane, .takePathFromOtherPane, .swapPanes:
             return .panes
-        case .newFolder, .newFile, .copyToOtherPane, .moveToOtherPane, .duplicate, .moveToTrash,
-            .deletePermanently, .openInTerminal, .revealInFinder, .copyPathToClipboard:
+        case .newFolder, .newFile, .copyToOtherPane, .moveToOtherPane, .duplicate,
+            .renameInPlace, .moveToTrash, .deletePermanently, .openInTerminal, .revealInFinder,
+            .copyPathToClipboard:
             return .file
         }
     }

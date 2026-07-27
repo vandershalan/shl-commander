@@ -14,12 +14,15 @@ struct FileTableView: NSViewRepresentable {
     let sort: SortOrder
     /// Drives first-responder handoff between the two panes.
     let isActive: Bool
+    /// Opens the in-place editor when this counter changes.
+    let renameRequestID: Int
 
     let onCursorChange: (Int) -> Void
     let onMove: (CursorMove) -> Void
     let onOpen: () -> Void
     let onSort: (SortKey, Bool) -> Void
     let onActivate: () -> Void
+    let onRename: (Int, String) -> Void
     let onKeyDown: (NSEvent) -> Bool
 
     func makeCoordinator() -> FileTableController { FileTableController() }
@@ -77,6 +80,7 @@ struct FileTableView: NSViewRepresentable {
         controller.onCursorChange = onCursorChange
         controller.onOpen = onOpen
         controller.onSort = onSort
+        controller.onRename = onRename
         table.keyHandler = onKeyDown
         table.onMove = onMove
         table.onBecomeFirstResponder = onActivate
@@ -100,6 +104,14 @@ struct FileTableView: NSViewRepresentable {
 
         if isActive, table.window?.firstResponder !== table {
             table.window?.makeFirstResponder(table)
+        }
+
+        // After the cursor is in sync, so the editor opens on the right row.
+        if controller.handledRenameRequest != renameRequestID {
+            controller.handledRenameRequest = renameRequestID
+            if renameRequestID > 0, isActive {
+                controller.beginRename(row: cursor, on: table)
+            }
         }
     }
 }

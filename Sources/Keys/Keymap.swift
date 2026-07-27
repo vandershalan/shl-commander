@@ -61,6 +61,7 @@ extension Keymap {
         .copyToOtherPane: [chord("f5"), chord("cmd+c")],
         .moveToOtherPane: [chord("f6"), chord("cmd+m")],
         .duplicate: [chord("shift+f5"), chord("cmd+d")],
+        .renameInPlace: [chord("shift+f6"), chord("cmd+return")],
         // ⌘⌫ is what the Finder uses, so the muscle memory transfers either way.
         .moveToTrash: [chord("f8"), chord("cmd+backspace")],
         .deletePermanently: [chord("shift+f8"), chord("cmd+shift+backspace")],

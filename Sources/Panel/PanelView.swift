@@ -20,6 +20,7 @@ struct PanelView: View {
                 marks: panel.marks,
                 sort: panel.sort,
                 isActive: isActive,
+                renameRequestID: panel.renameRequestID,
                 onCursorChange: { panel.cursor = $0 },
                 onMove: { panel.move($0) },
                 onOpen: { panel.openCursor() },
@@ -31,6 +32,16 @@ struct PanelView: View {
                     )
                 },
                 onActivate: onActivate,
+                onRename: { row, newName in
+                    if let message = panel.commitRename(at: row, to: newName) {
+                        OperationPrompts.report([
+                            OperationFailure(
+                                url: panel.directory.appendingPathComponent(newName),
+                                message: message
+                            )
+                        ])
+                    }
+                },
                 onKeyDown: onKeyDown
             )
             Divider()
