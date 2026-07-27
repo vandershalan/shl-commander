@@ -22,6 +22,9 @@ final class AppState {
     /// One operation at a time, shared by both panes.
     let operations = FileOperationQueue()
 
+    /// Shared so a mount or unmount updates both panes' volume pickers at once.
+    let volumes = VolumeService()
+
     init(
         left: URL = FileManager.default.homeDirectoryForCurrentUser,
         right: URL = FileManager.default.homeDirectoryForCurrentUser,

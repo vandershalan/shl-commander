@@ -4,6 +4,7 @@ import SwiftUI
 /// One pane: path bar on top, file table in the middle, tallies at the bottom.
 struct PanelView: View {
     let panel: PanelViewModel
+    let volumes: VolumeService
     let isActive: Bool
     let onActivate: () -> Void
     /// Every key press goes to `KeyRouter`; the panel itself binds nothing.
@@ -59,6 +60,7 @@ struct PanelView: View {
 
     private var pathBar: some View {
         HStack(spacing: 6) {
+            volumePicker
             Text(panel.directory.path)
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
@@ -74,6 +76,41 @@ struct PanelView: View {
         .background(isActive ? Color.accentColor.opacity(0.18) : Color.clear)
     }
 
+    /// Total Commander's drive buttons, condensed into one menu per pane.
+    private var volumePicker: some View {
+        Menu {
+            ForEach(volumes.volumes) { volume in
+                Button {
+                    onActivate()
+                    panel.navigate(to: volume.url)
+                } label: {
+                    Text(
+                        "\(volume.name) — \(Formatters.size(volume.availableCapacity)) free"
+                    )
+                }
+            }
+            let ejectable = volumes.volumes.filter(\.canEject)
+            if !ejectable.isEmpty {
+                Divider()
+                ForEach(ejectable) { volume in
+                    Button("Eject \(volume.name)") {
+                        if let message = volumes.eject(volume) {
+                            OperationPrompts.report([
+                                OperationFailure(url: volume.url, message: message)
+                            ])
+                        }
+                    }
+                }
+            }
+        } label: {
+            Text(volumes.volume(containing: panel.directory)?.name ?? "Volume")
+                .font(.system(size: 11))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Switch volume")
+    }
+
     private var footer: some View {
         HStack(spacing: 8) {
             if let error = panel.loadError {
@@ -85,6 +122,9 @@ struct PanelView: View {
                     .foregroundStyle(panel.markedCount > 0 ? Color.red : Color.secondary)
                 Spacer(minLength: 0)
                 Text("\(panel.directoryCount) dirs, \(panel.fileCount) files")
+                if let free = panel.freeSpace {
+                    Text("· \(Formatters.size(free)) free")
+                }
             }
             Spacer(minLength: 0)
             if !panel.filter.isEmpty {

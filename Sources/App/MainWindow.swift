@@ -39,6 +39,7 @@ struct MainWindow: View {
             HStack(spacing: 0) {
                 PanelView(
                     panel: state.left,
+                    volumes: state.volumes,
                     isActive: state.active == .left,
                     onActivate: { state.active = .left },
                     onKeyDown: router.handle
@@ -49,6 +50,7 @@ struct MainWindow: View {
 
                 PanelView(
                     panel: state.right,
+                    volumes: state.volumes,
                     isActive: state.active == .right,
                     onActivate: { state.active = .right },
                     onKeyDown: router.handle

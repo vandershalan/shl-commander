@@ -34,6 +34,8 @@ final class PanelViewModel: Identifiable {
     private(set) var listingID = UUID()
     private(set) var loadError: String?
     private(set) var isLoading = false
+    /// Free space on the volume the panel is on, refreshed with each listing.
+    private(set) var freeSpace: Int64?
 
     /// Marked rows, held by URL so they survive a reload of the same directory.
     private(set) var marks: Set<URL> = []
@@ -77,6 +79,9 @@ final class PanelViewModel: Identifiable {
     private static let historyLimit = 100
     private var backStack: [URL] = []
     private var forwardStack: [URL] = []
+
+    /// Recreated on every directory change; nil when the OS refused a stream.
+    private var watcher: FSEventsWatcher?
 
     init(directory: URL = FileManager.default.homeDirectoryForCurrentUser) {
         // Standardised on the way in so `enter` never sees two spellings of one directory.
@@ -157,7 +162,16 @@ final class PanelViewModel: Identifiable {
         }
         directory = url
         filter = ""
+        startWatching()
         load(keeping: selecting)
+    }
+
+    /// A watcher is bound to one path, so it is replaced whenever the panel moves.
+    private func startWatching() {
+        watcher = FSEventsWatcher(watching: directory) { [weak self] in
+            // Cursor position and marks survive because reload keys them by name and URL.
+            self?.reload()
+        }
     }
 
     /// Re-reads the current directory. Holds the cursor on the same name by default, or moves
@@ -318,6 +332,8 @@ final class PanelViewModel: Identifiable {
 
     private func apply(_ outcome: ListingOutcome, keeping name: String?) {
         isLoading = false
+        freeSpace = (try? directory.resourceValues(forKeys: [.volumeAvailableCapacityKey]))
+            .flatMap(\.volumeAvailableCapacity).map(Int64.init)
         switch outcome {
         case .listed(let children):
             var rows = sort.sorted(children)
