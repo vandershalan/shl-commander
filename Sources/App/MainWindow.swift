@@ -1,14 +1,14 @@
 import SwiftUI
 
-/// Placeholder shell. Step 2 replaces the body with the dual-pane split view.
+/// Step 1 shows a single pane. Step 2 splits this into two.
 struct MainWindow: View {
+    @State private var panel = PanelViewModel()
+
     var body: some View {
-        VStack(spacing: 12) {
-            Text("shl-commander")
-                .font(.system(size: 28, weight: .semibold, design: .rounded))
-            Text("scaffold — dual panes land in step 2")
-                .foregroundStyle(.secondary)
-        }
-        .frame(minWidth: 800, minHeight: 500)
+        PanelView(panel: panel)
+            .frame(minWidth: 700, minHeight: 400)
+            .task {
+                panel.navigate(to: panel.directory)
+            }
     }
 }
