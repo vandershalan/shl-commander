@@ -44,7 +44,53 @@ setting. Holding `fn` works too.
 
 ## Keyboard reference
 
-See [`Resources/default-keymap.json`](Resources/default-keymap.json) for the shipped
-bindings. Overrides go in
-`~/Library/Application Support/shl-commander/keymap.json` and are merged over the defaults
-at launch.
+Every command has a Total Commander binding and, where a stock Mac cannot press that key, a
+⌘ equivalent. Typing any other printable character starts a quick filter.
+
+| Command | Total Commander | macOS |
+| --- | --- | --- |
+| Switch pane | `Tab` | |
+| Open | `Return`, keypad `Enter` | |
+| Enclosing folder | `Backspace`, `⌃PageUp` | `⌘↑` |
+| Volume root | `⌃\` | |
+| Back / Forward | `⌥←` / `⌥→` | `⌘[` / `⌘]` |
+| Refresh | `F2`, `⌃R` | `⌘R` |
+| Sort by name / ext / date / size | `⌃F3` / `⌃F4` / `⌃F5` / `⌃F6` | `⌘⌥1`–`⌘⌥4` |
+| Show hidden files | `⌃H` | `⌘⇧.` |
+| Mark | `Space` | |
+| Mark and advance | `Insert` | `⇧Space` |
+| Mark / unmark by pattern | keypad `+` / keypad `-` | |
+| Invert marks | keypad `*` | |
+| Mark all / none | `⌃A` / `⌃⇧A` | `⌘A` / `⌘⇧A` |
+| Send / take path across panes | `⌃⇧→` / `⌃⇧←` | |
+| Swap panes | `⌃U` | |
+| Open in Terminal | | `⌘⇧T` |
+| Reveal in Finder | | `⌘⇧R` |
+| Copy path | `⌃⇧Return` | `⌘⌥C` |
+| Clear filter | `Esc` | |
+
+Sorting is also available by clicking a column header, and `Backspace` edits an active
+quick filter before it means "go up".
+
+### Rebinding
+
+Create `~/Library/Application Support/shl-commander/keymap.json` with only the differences —
+anything you leave out keeps its default:
+
+```json
+{
+  "_comment": "keys starting with _ are ignored",
+  "swapPanes": ["cmd+shift+s"],
+  "revealInFinder": []
+}
+```
+
+An empty array unbinds a command. Command names are the `Command` cases in
+`Sources/Keys/Command.swift`. Chords are `modifier+…+key`, where modifiers are `cmd`,
+`ctrl`, `opt` (or `alt`), and `shift`, and keys are letters, digits, `f1`–`f12`, `space`,
+`return`, `tab`, `backspace`, `escape`, `insert`, `home`, `end`, `pageup`, `pagedown`,
+`up`/`down`/`left`/`right`, punctuation names such as `period` / `comma` / `backslash` /
+`leftbracket`, and `keypadplus` / `keypadminus` / `keypadmultiply` / `keypadenter`. The
+keypad keys are spelled out so that `+` is never both a separator and a key name.
+
+Changes take effect on relaunch. A malformed entry is skipped rather than guessed at.

@@ -74,8 +74,15 @@ final class PanelViewModel: Identifiable {
     private var cursorStorage: Int = 0
     private var loadTask: Task<Void, Never>?
 
+    private static let historyLimit = 100
+    private var backStack: [URL] = []
+    private var forwardStack: [URL] = []
+
     init(directory: URL = FileManager.default.homeDirectoryForCurrentUser) {
-        self.directory = directory
+        // Standardised on the way in so `enter` never sees two spellings of one directory.
+        // Symlinks are deliberately left unresolved: the panel shows the path the user asked
+        // for, not wherever it happens to point.
+        self.directory = directory.standardizedFileURL
     }
 
     var cursorEntry: FileEntry? {
@@ -111,7 +118,44 @@ final class PanelViewModel: Identifiable {
 
     /// Enters `url`. The cursor lands on `selecting` when given, otherwise on the first row.
     func navigate(to url: URL, selecting: String? = nil) {
-        directory = url.standardizedFileURL
+        enter(url.standardizedFileURL, selecting: selecting, recordHistory: true)
+    }
+
+    /// Jumps to the root of the volume the panel is currently on, which for the boot volume
+    /// is `/` and for an external disk is its mount point.
+    func goToVolumeRoot() {
+        let volume = try? directory.resourceValues(forKeys: [.volumeURLKey]).volume
+        navigate(to: volume ?? URL(fileURLWithPath: "/"))
+    }
+
+    var canGoBack: Bool { !backStack.isEmpty }
+    var canGoForward: Bool { !forwardStack.isEmpty }
+
+    func historyBack() {
+        guard let previous = backStack.popLast() else { return }
+        forwardStack.append(directory)
+        enter(previous, selecting: nil, recordHistory: false)
+    }
+
+    func historyForward() {
+        guard let next = forwardStack.popLast() else { return }
+        backStack.append(directory)
+        enter(next, selecting: nil, recordHistory: false)
+    }
+
+    /// Single funnel for every directory change, so history and filter reset behave the same
+    /// no matter which command triggered the move.
+    private func enter(_ url: URL, selecting: String?, recordHistory: Bool) {
+        // Compared by path, not by URL: `standardizedFileURL` marks an existing directory
+        // with a trailing slash, so two URLs for the same folder compare unequal and every
+        // "reload where I already am" would push a bogus history entry and wipe the
+        // forward stack.
+        if recordHistory, url.path != directory.path {
+            backStack.append(directory)
+            forwardStack.removeAll()
+            if backStack.count > Self.historyLimit { backStack.removeFirst() }
+        }
+        directory = url
         filter = ""
         load(keeping: selecting)
     }
@@ -134,10 +178,7 @@ final class PanelViewModel: Identifiable {
     /// Ascends one level, parking the cursor on the directory just left.
     func goUp() {
         guard let up = DirectoryLister.parent(of: directory) else { return }
-        let leaving = directory.lastPathComponent
-        directory = up
-        filter = ""
-        load(keeping: leaving)
+        enter(up, selecting: directory.lastPathComponent, recordHistory: true)
     }
 
     func move(_ move: CursorMove) {
@@ -220,7 +261,7 @@ final class PanelViewModel: Identifiable {
             let outcome = await Self.read(target, includeHidden: includeHidden)
             guard let self, !Task.isCancelled else { return }
             // A newer navigation may have landed while this listing was in flight.
-            guard self.directory == target else { return }
+            guard self.directory.path == target.path else { return }
             self.apply(outcome, keeping: name)
         }
     }

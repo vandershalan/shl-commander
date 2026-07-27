@@ -16,12 +16,17 @@ final class AppState {
     let right: PanelViewModel
     var active: Side = .left
 
+    /// Loaded once at launch. Rebinding requires a relaunch until step 9's keymap editor.
+    let keymap: Keymap
+
     init(
         left: URL = FileManager.default.homeDirectoryForCurrentUser,
-        right: URL = FileManager.default.homeDirectoryForCurrentUser
+        right: URL = FileManager.default.homeDirectoryForCurrentUser,
+        keymap: Keymap = .loadFromDisk()
     ) {
         self.left = PanelViewModel(directory: left)
         self.right = PanelViewModel(directory: right)
+        self.keymap = keymap
     }
 
     func panel(_ side: Side) -> PanelViewModel {

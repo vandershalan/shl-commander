@@ -5,7 +5,8 @@ import SwiftUI
 /// Built from an `HStack` plus a drag handle rather than `HSplitView` because the divider
 /// position has to persist across launches, and `HSplitView` does not expose it.
 struct MainWindow: View {
-    @State private var state = AppState()
+    let state: AppState
+
     @AppStorage("dividerFraction") private var dividerFraction: Double = 0.5
     /// Divider fraction at the moment the current drag started, or nil when idle.
     @State private var dragStartFraction: Double?
@@ -13,6 +14,10 @@ struct MainWindow: View {
     /// Keeps either pane from being dragged down to an unusable sliver.
     private let minimumPaneWidth: CGFloat = 260
     private let dividerWidth: CGFloat = 6
+
+    private var router: KeyRouter {
+        KeyRouter(state: state, dispatcher: CommandDispatcher(state: state))
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -24,7 +29,7 @@ struct MainWindow: View {
                     panel: state.left,
                     isActive: state.active == .left,
                     onActivate: { state.active = .left },
-                    onSwitchPane: { state.toggleActive() }
+                    onKeyDown: router.handle
                 )
                 .frame(width: leftWidth)
 
@@ -34,7 +39,7 @@ struct MainWindow: View {
                     panel: state.right,
                     isActive: state.active == .right,
                     onActivate: { state.active = .right },
-                    onSwitchPane: { state.toggleActive() }
+                    onKeyDown: router.handle
                 )
                 .frame(maxWidth: .infinity)
             }

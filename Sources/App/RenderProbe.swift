@@ -27,7 +27,22 @@
                     }
                 }
                 NSLog("PROBE content=%@", NSStringFromRect(view.bounds))
+                dumpMenu()
                 dump(view, depth: 0)
+            }
+        }
+
+        private static func dumpMenu() {
+            for top in NSApp.mainMenu?.items ?? [] {
+                NSLog("PROBE MENU %@", top.title)
+                for item in top.submenu?.items ?? [] {
+                    let equivalent =
+                        item.keyEquivalent.isEmpty
+                        ? "" : " [\(item.keyEquivalentModifierMask.rawValue):\(item.keyEquivalent)]"
+                    NSLog(
+                        "PROBE MENU   %@%@%@", item.isSeparatorItem ? "---" : item.title,
+                        equivalent, item.isEnabled ? "" : " (disabled)")
+                }
             }
         }
 
