@@ -20,6 +20,18 @@ struct MainWindow: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            panes
+            if let progress = state.operations.progress {
+                Divider()
+                OperationProgressBar(progress: progress) { state.operations.cancel() }
+            }
+        }
+        .frame(minWidth: 2 * minimumPaneWidth + dividerWidth, minHeight: 400)
+        .task { state.start() }
+    }
+
+    private var panes: some View {
         GeometryReader { geometry in
             let available = geometry.size.width - dividerWidth
             let leftWidth = clampedLeftWidth(in: available)
@@ -44,8 +56,6 @@ struct MainWindow: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .frame(minWidth: 2 * minimumPaneWidth + dividerWidth, minHeight: 400)
-        .task { state.start() }
     }
 
     private func clampedLeftWidth(in available: CGFloat) -> CGFloat {

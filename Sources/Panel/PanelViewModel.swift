@@ -160,9 +160,10 @@ final class PanelViewModel: Identifiable {
         load(keeping: selecting)
     }
 
-    /// Re-reads the current directory, holding the cursor on the same name.
-    func reload() {
-        load(keeping: cursorEntry?.name)
+    /// Re-reads the current directory. Holds the cursor on the same name by default, or moves
+    /// it to `selecting` — used to land on a folder or file just created.
+    func reload(selecting: String? = nil) {
+        load(keeping: selecting ?? cursorEntry?.name)
     }
 
     /// Opens the row under the cursor. Directories are entered; files await step 8.

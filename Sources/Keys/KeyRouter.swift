@@ -11,6 +11,16 @@ struct KeyRouter {
         // A rename editor or dialog field owns its keystrokes.
         guard !isEditingText(event) else { return false }
 
+        // While an operation is running, Escape cancels it. Checked first so it beats the
+        // clear-filter binding.
+        if event.keyCode == Self.escapeKeyCode,
+            event.modifierFlags.intersection(KeyChord.significant).isEmpty,
+            state.operations.isRunning
+        {
+            state.operations.cancel()
+            return true
+        }
+
         let panel = state.activePanel
 
         // Backspace edits an active filter and only otherwise means "go up". Checked ahead of
@@ -44,6 +54,7 @@ struct KeyRouter {
     }
 
     private static let backspaceKeyCode: UInt16 = 51
+    private static let escapeKeyCode: UInt16 = 53
 
     /// Space is excluded because it marks rows; everything else printable feeds the filter.
     private static func isFilterable(_ character: Character) -> Bool {

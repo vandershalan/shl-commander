@@ -38,9 +38,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static func pruneMenuBar() {
         guard let mainMenu = NSApp.mainMenu else { return }
         let deadActions: Set<Selector> = [
-            Selector(("toggleSidebar:")),
-            Selector(("toggleToolbarShown:")),
-            Selector(("runToolbarCustomizationPalette:")),
+            // Built from strings because these selectors belong to AppKit, not to this app,
+            // so #selector has nothing to reference.
+            NSSelectorFromString("toggleSidebar:"),
+            NSSelectorFromString("toggleToolbarShown:"),
+            NSSelectorFromString("runToolbarCustomizationPalette:"),
         ]
 
         for top in mainMenu.items {

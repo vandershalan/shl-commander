@@ -32,6 +32,7 @@
             }
         }
 
+        @MainActor
         private static func dumpMenu() {
             for top in NSApp.mainMenu?.items ?? [] {
                 NSLog("PROBE MENU %@", top.title)
@@ -46,6 +47,7 @@
             }
         }
 
+        @MainActor
         private static func dump(_ view: NSView, depth: Int) {
             guard depth < 14 else { return }
             let label = (view as? NSTextField).map { " text=\u{22}\($0.stringValue)\u{22}" } ?? ""

@@ -10,6 +10,22 @@ struct CommandDispatcher {
         let panel = state.activePanel
 
         switch command {
+        // File operations
+        case .newFolder:
+            createItem(on: panel, directory: true)
+        case .newFile:
+            createItem(on: panel, directory: false)
+        case .copyToOtherPane:
+            startTransfer(.copy)
+        case .moveToOtherPane:
+            startTransfer(.move)
+        case .duplicate:
+            duplicate(on: panel)
+        case .moveToTrash:
+            delete(on: panel, toTrash: true)
+        case .deletePermanently:
+            delete(on: panel, toTrash: false)
+
         // Navigation
         case .switchPane:
             state.toggleActive()
@@ -89,6 +105,129 @@ struct CommandDispatcher {
         case .markNone, .invertMarks: return !panel.entries.isEmpty
         case .goUp: return DirectoryLister.parent(of: panel.directory) != nil
         default: return true
+        }
+    }
+
+    // MARK: - File operations
+
+    /// Copy and move both confirm through a dialog holding the other pane's path, which is
+    /// how Total Commander works: Enter accepts, and the path can be edited to send the files
+    /// somewhere else entirely.
+    private func startTransfer(_ kind: FileOperationKind) {
+        let panel = state.activePanel
+        let targets = panel.actionTargets
+        guard !targets.isEmpty, !state.operations.isRunning else { return }
+
+        let summary = targets.count == 1
+            ? "\u{22}\(targets[0].name)\u{22}"
+            : "\(targets.count) items"
+        guard
+            let typed = OperationPrompts.askForName(
+                title: "\(kind.title) \(summary) to:",
+                message: "The folder is created if it does not exist.",
+                initial: state.inactivePanel.directory.path,
+                buttonTitle: kind.title
+            )
+        else { return }
+
+        guard let destination = resolveDestination(typed) else { return }
+        state.operations.start(
+            FileOperationRequest(
+                kind: kind,
+                sources: targets.map(\.url),
+                destinationDirectory: destination
+            ),
+            prompt: OperationPrompts()
+        )
+    }
+
+    /// Turns typed text into a usable destination directory, creating it when needed.
+    private func resolveDestination(_ typed: String) -> URL? {
+        let expanded = (typed as NSString).expandingTildeInPath
+        let url = URL(fileURLWithPath: expanded).standardizedFileURL
+        var isDirectory: ObjCBool = false
+
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) {
+            guard isDirectory.boolValue else {
+                OperationPrompts.report([
+                    OperationFailure(url: url, message: "Not a folder.")
+                ])
+                return nil
+            }
+            return url
+        }
+
+        do {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            return url
+        } catch {
+            OperationPrompts.report([
+                OperationFailure(url: url, message: error.localizedDescription)
+            ])
+            return nil
+        }
+    }
+
+    /// Copies into the current directory, where every name collides by definition — so it
+    /// resolves to "keep both" without asking.
+    private func duplicate(on panel: PanelViewModel) {
+        let targets = panel.actionTargets
+        guard !targets.isEmpty, !state.operations.isRunning else { return }
+
+        state.operations.start(
+            FileOperationRequest(
+                kind: .copy,
+                sources: targets.map(\.url),
+                destinationDirectory: panel.directory,
+                automaticResolution: .rename
+            ),
+            prompt: OperationPrompts()
+        )
+    }
+
+    private func delete(on panel: PanelViewModel, toTrash: Bool) {
+        let targets = panel.actionTargets
+        guard !targets.isEmpty, !state.operations.isRunning else { return }
+        // A trash move is recoverable from the Finder, so it needs no confirmation. A
+        // permanent delete is not.
+        if !toTrash, !OperationPrompts.confirmPermanentDelete(targets) { return }
+
+        state.operations.startDeletion(of: targets.map(\.url), toTrash: toTrash)
+    }
+
+    private func createItem(on panel: PanelViewModel, directory: Bool) {
+        guard
+            let name = OperationPrompts.askForName(
+                title: directory ? "New folder name:" : "New file name:"
+            )
+        else { return }
+        // "/" is a path separator and ":" is one to the classic Finder APIs; neither can
+        // appear in a name.
+        guard !name.contains("/"), !name.contains(":") else {
+            OperationPrompts.report([
+                OperationFailure(
+                    url: panel.directory.appendingPathComponent(name),
+                    message: "A name cannot contain / or :"
+                )
+            ])
+            return
+        }
+
+        let url = panel.directory.appendingPathComponent(name)
+        do {
+            if directory {
+                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+            } else {
+                guard !FileManager.default.fileExists(atPath: url.path) else {
+                    throw CocoaError(.fileWriteFileExists)
+                }
+                try Data().write(to: url, options: .withoutOverwriting)
+            }
+            panel.reload(selecting: name)
+        } catch {
+            OperationPrompts.report([
+                OperationFailure(url: url, message: error.localizedDescription)
+            ])
         }
     }
 

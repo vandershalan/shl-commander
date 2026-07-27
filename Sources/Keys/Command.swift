@@ -5,6 +5,15 @@ import Foundation
 ///
 /// Commands are added in the step that implements them; a name here always does something.
 enum Command: String, CaseIterable, Codable, Sendable {
+    // File operations
+    case newFolder
+    case newFile
+    case copyToOtherPane
+    case moveToOtherPane
+    case duplicate
+    case moveToTrash
+    case deletePermanently
+
     // Navigation
     case switchPane
     case openCursor
@@ -44,6 +53,13 @@ enum Command: String, CaseIterable, Codable, Sendable {
     /// Menu title. Also what the README's shortcut table prints.
     var title: String {
         switch self {
+        case .newFolder: return "New Folder…"
+        case .newFile: return "New File…"
+        case .copyToOtherPane: return "Copy…"
+        case .moveToOtherPane: return "Move…"
+        case .duplicate: return "Duplicate"
+        case .moveToTrash: return "Move to Trash"
+        case .deletePermanently: return "Delete Permanently…"
         case .switchPane: return "Switch Pane"
         case .openCursor: return "Open"
         case .goUp: return "Enclosing Folder"
@@ -86,7 +102,8 @@ enum Command: String, CaseIterable, Codable, Sendable {
             return .mark
         case .sendPathToOtherPane, .takePathFromOtherPane, .swapPanes:
             return .panes
-        case .openInTerminal, .revealInFinder, .copyPathToClipboard:
+        case .newFolder, .newFile, .copyToOtherPane, .moveToOtherPane, .duplicate, .moveToTrash,
+            .deletePermanently, .openInTerminal, .revealInFinder, .copyPathToClipboard:
             return .file
         }
     }

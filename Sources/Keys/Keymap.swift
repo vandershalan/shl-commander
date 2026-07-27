@@ -56,6 +56,15 @@ extension Keymap {
     /// F1, F2, etc. keys as standard function keys" is on, so without them a stock Mac
     /// could not drive the app at all.
     static let defaults = Keymap([
+        .newFolder: [chord("f7"), chord("cmd+shift+n")],
+        .newFile: [chord("shift+f4"), chord("cmd+shift+f")],
+        .copyToOtherPane: [chord("f5"), chord("cmd+c")],
+        .moveToOtherPane: [chord("f6"), chord("cmd+m")],
+        .duplicate: [chord("shift+f5"), chord("cmd+d")],
+        // ⌘⌫ is what the Finder uses, so the muscle memory transfers either way.
+        .moveToTrash: [chord("f8"), chord("cmd+backspace")],
+        .deletePermanently: [chord("shift+f8"), chord("cmd+shift+backspace")],
+
         .switchPane: [chord("tab")],
         .openCursor: [chord("return"), chord("keypadenter")],
         .goUp: [chord("backspace"), chord("ctrl+pageup"), chord("cmd+up")],
