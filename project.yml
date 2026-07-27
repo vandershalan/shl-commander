@@ -1,0 +1,71 @@
+name: ShlCommander
+
+options:
+  bundleIdPrefix: com.szalankiewicz
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+targets:
+  ShlCommander:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+      - path: Resources
+        excludes:
+          - Info.plist
+          - ShlCommander.entitlements
+    settings:
+      base:
+        PRODUCT_NAME: shl-commander
+        PRODUCT_MODULE_NAME: ShlCommander
+        PRODUCT_BUNDLE_IDENTIFIER: com.szalankiewicz.shl-commander
+        INFOPLIST_FILE: Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/ShlCommander.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+        LD_RUNPATH_SEARCH_PATHS: ["$(inherited)", "@executable_path/../Frameworks"]
+
+  CoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/CoreTests
+    dependencies:
+      - target: ShlCommander
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.szalankiewicz.shl-commander.CoreTests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: ""
+        # XcodeGen derives TEST_HOST from the target name; the app target renames
+        # its product to shl-commander, so point both at the real binary.
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/shl-commander.app/Contents/MacOS/shl-commander
+        BUNDLE_LOADER: $(TEST_HOST)
+
+schemes:
+  ShlCommander:
+    build:
+      targets:
+        ShlCommander: all
+        CoreTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - CoreTests
