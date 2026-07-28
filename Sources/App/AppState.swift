@@ -17,8 +17,10 @@ final class AppState {
     let right: PanelViewModel
     var active: Side = .left
 
-    /// Loaded once at launch. Rebinding requires a relaunch until step 9's keymap editor.
-    let keymap: Keymap
+    /// Loaded at launch and replaceable from Preferences, so a rebind takes effect at once.
+    /// Menu shortcuts are the exception: SwiftUI installs those once and does not rebuild
+    /// them on demand.
+    var keymap: Keymap
 
     /// One operation at a time, shared by both panes.
     let operations = FileOperationQueue()
@@ -31,14 +33,20 @@ final class AppState {
     /// Outlives the pop-up favourites menu, which needs an NSObject target.
     let favoriteMenuTarget = FavoriteMenuTarget()
 
+    /// `settings` is injectable so tests can run against their own defaults domain instead of
+    /// the user's, which would otherwise pull in a real saved session.
+    let settings: AppSettings
+
     init(
         left: URL = FileManager.default.homeDirectoryForCurrentUser,
         right: URL = FileManager.default.homeDirectoryForCurrentUser,
-        keymap: Keymap = .loadFromDisk()
+        keymap: Keymap = .loadFromDisk(),
+        settings: AppSettings = .shared
     ) {
         self.left = PanelViewModel(directory: left)
         self.right = PanelViewModel(directory: right)
         self.keymap = keymap
+        self.settings = settings
     }
 
     func panel(_ side: Side) -> PanelViewModel {
@@ -101,9 +109,13 @@ final class AppState {
             MainActor.assumeIsolated { self?.saveSession() }
         }
 
-        if let session = SessionStore.load() {
+        if settings.restoreSession, let session = SessionStore.load() {
             restore(session)
         } else {
+            // The panes were constructed with the directories they should open at, so this
+            // path just loads them rather than second-guessing where they came from.
+            left.showHidden = settings.showHiddenByDefault
+            right.showHidden = settings.showHiddenByDefault
             left.navigate(to: left.directory)
             right.navigate(to: right.directory)
         }

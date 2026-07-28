@@ -188,6 +188,42 @@ extension Keymap {
         guard let data = try? Data(contentsOf: userKeymapURL) else { return .defaults }
         return merging(overrides: data)
     }
+
+    /// The full binding table as JSON. Every command is written out, not just the differences,
+    /// so the exported file doubles as a reference of what is bindable.
+    func exportJSON() -> Data? {
+        var object: [String: Any] = [
+            "_comment": "Edit and relaunch. An empty array unbinds a command."
+        ]
+        for command in Command.allCases {
+            object[command.rawValue] = chords(for: command).map(\.canonicalName)
+        }
+        return try? JSONSerialization.data(
+            withJSONObject: object,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+    }
+
+    @discardableResult
+    func writeToDisk() -> Bool {
+        guard AppPaths.ensureSupportDirectory() != nil, let data = exportJSON() else {
+            return false
+        }
+        return (try? data.write(to: Self.userKeymapURL, options: .atomic)) != nil
+    }
+
+    /// Replaces one command's bindings, dropping the chord from any command that already
+    /// claimed it — two commands on one key would make the winner arbitrary.
+    func rebinding(_ command: Command, to chords: [KeyChord]) -> Keymap {
+        var table = chordsByCommand
+        for chord in chords {
+            for (other, existing) in table where other != command {
+                table[other] = existing.filter { $0 != chord }
+            }
+        }
+        table[command] = chords
+        return Keymap(table)
+    }
 }
 
 /// Where the app keeps its own files.

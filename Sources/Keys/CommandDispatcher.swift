@@ -293,9 +293,9 @@ struct CommandDispatcher {
     /// Opens in the configured editor, or in whatever the system would use otherwise.
     private func edit(_ panel: PanelViewModel) {
         guard let entry = panel.actionTargets.first, !entry.isDirectory else { return }
-        let identifier = UserDefaults.standard.string(forKey: "editorBundleIdentifier")
+        let identifier = AppSettings.shared.editorBundleIdentifier
         guard
-            let identifier,
+            !identifier.isEmpty,
             let application = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier)
         else {
             NSWorkspace.shared.open(entry.url)

@@ -4,7 +4,10 @@ import SwiftUI
 struct ShlCommanderApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     /// Owned here rather than in `MainWindow` so the menu bar can reach it too.
-    @State private var state = AppState()
+    @State private var state = AppState(
+        left: AppSettings.shared.startURL(forLeft: true),
+        right: AppSettings.shared.startURL(forLeft: false)
+    )
 
     var body: some Scene {
         Window("shl-commander", id: "main") {
@@ -12,6 +15,10 @@ struct ShlCommanderApp: App {
         }
         .defaultSize(width: 1200, height: 750)
         .commands { MainCommands(state: state) }
+
+        Settings {
+            PreferencesView(state: state)
+        }
     }
 }
 

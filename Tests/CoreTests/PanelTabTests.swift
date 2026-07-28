@@ -217,7 +217,10 @@ struct SessionTests {
         }
         try left.directory("sub")
 
-        let state = AppState(left: left.root, right: right.root, keymap: .defaults)
+        let state = AppState(
+            left: left.root, right: right.root, keymap: .defaults,
+            settings: isolatedSettings()
+        )
         state.left.navigate(to: left.root)
         state.right.navigate(to: right.root)
         await state.left.settle()
@@ -243,7 +246,10 @@ struct SessionTests {
         }
         let sub = try left.directory("sub")
 
-        let state = AppState(left: left.root, right: right.root, keymap: .defaults)
+        let state = AppState(
+            left: left.root, right: right.root, keymap: .defaults,
+            settings: isolatedSettings()
+        )
         state.restore(
             Session(
                 left: PanelSession(

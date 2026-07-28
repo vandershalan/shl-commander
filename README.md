@@ -11,6 +11,7 @@ make build    # xcodebuild, Debug
 make test     # unit tests
 make run      # build then launch the app
 make release  # Release build, signed, installed to /Applications
+make icon     # redraw Resources/AppIcon.icns from Tools/make-icon.swift
 ```
 
 ## One-time macOS setup
@@ -96,7 +97,14 @@ defaults write com.szalankiewicz.shl-commander editorBundleIdentifier com.micros
 
 ### Rebinding
 
-Create `~/Library/Application Support/shl-commander/keymap.json` with only the differences —
+**Settings → Keyboard** (`⌘,`) lists every command with its keys. Select one, press *Record
+Shortcut*, and press the chord. A key already used elsewhere is taken from the other
+command, since two commands on one key would make the winner arbitrary. Changes apply
+immediately and are written to `keymap.json`; the menu-bar shortcuts catch up on the next
+launch, because SwiftUI installs those once at startup.
+
+To edit the file directly instead, create
+`~/Library/Application Support/shl-commander/keymap.json` with only the differences —
 anything you leave out keeps its default:
 
 ```json
@@ -116,3 +124,17 @@ An empty array unbinds a command. Command names are the `Command` cases in
 keypad keys are spelled out so that `+` is never both a separator and a key name.
 
 Changes take effect on relaunch. A malformed entry is skipped rather than guessed at.
+
+## Settings
+
+`⌘,` opens Settings.
+
+- **General** — restore the last session or always open at chosen folders, show hidden files
+  by default, and pick the editor `F4` uses.
+- **Keyboard** — the shortcut table described above.
+
+## Where things are kept
+
+`~/Library/Application Support/shl-commander/` holds `favorites.json`, `keymap.json`, and
+`session.json`. Delete any of them to go back to defaults; the app writes the session on
+quit and rereads it at launch.

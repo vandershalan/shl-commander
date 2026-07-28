@@ -8,7 +8,7 @@ import Testing
 struct AppStateTests {
     @Test("Tab flips focus between the two panes")
     func toggleActive() {
-        let state = AppState()
+        let state = AppState(settings: isolatedSettings())
         #expect(state.active == .left)
         #expect(state.activePanel === state.left)
         #expect(state.inactivePanel === state.right)
@@ -28,7 +28,7 @@ struct AppStateTests {
             right.remove()
         }
 
-        let state = AppState(left: left.root, right: right.root)
+        let state = AppState(left: left.root, right: right.root, settings: isolatedSettings())
         #expect(state.left !== state.right)
         #expect(state.left.directory.path == left.root.path)
         #expect(state.right.directory.path == right.root.path)
@@ -48,7 +48,7 @@ struct AppStateTests {
         try left.file("l.txt")
         try right.file("r.txt")
 
-        let state = AppState(left: left.root, right: right.root)
+        let state = AppState(left: left.root, right: right.root, settings: isolatedSettings())
         state.start()
         await state.left.settle()
         await state.right.settle()

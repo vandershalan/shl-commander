@@ -1,5 +1,7 @@
 import Foundation
 
+@testable import ShlCommander
+
 /// Throwaway directory tree for filesystem tests. Removed when the test's `defer` fires.
 struct TempTree {
     let root: URL
@@ -31,4 +33,14 @@ struct TempTree {
     func remove() {
         try? FileManager.default.removeItem(at: root)
     }
+}
+
+/// Settings backed by a throwaway defaults domain, with session restore off so a real
+/// `session.json` on the machine cannot leak into a test.
+@MainActor
+func isolatedSettings(_ label: String = "test") -> AppSettings {
+    let suite = "shl-commander.tests.\(label).\(UUID().uuidString)"
+    let settings = AppSettings(defaults: UserDefaults(suiteName: suite)!)
+    settings.restoreSession = false
+    return settings
 }

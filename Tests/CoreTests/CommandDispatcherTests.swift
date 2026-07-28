@@ -26,7 +26,10 @@ struct CommandDispatcherTests {
         try left.file("b.log", bytes: 20)
         try right.file("r.txt", bytes: 5)
 
-        let state = AppState(left: left.root, right: right.root, keymap: .defaults)
+        let state = AppState(
+            left: left.root, right: right.root, keymap: .defaults,
+            settings: isolatedSettings()
+        )
         state.start()
         await state.left.settle()
         await state.right.settle()
