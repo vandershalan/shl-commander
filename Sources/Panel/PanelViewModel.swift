@@ -1,3 +1,4 @@
+import AppKit
 import Darwin
 import Foundation
 import Observation
@@ -213,13 +214,16 @@ final class PanelViewModel: Identifiable {
         load(keeping: selecting ?? cursorEntry?.name)
     }
 
-    /// Opens the row under the cursor. Directories are entered; files await step 8.
+    /// Opens the row under the cursor: directories are entered, files are handed to the
+    /// system, which launches whatever is registered for them.
     func openCursor() {
         guard let entry = cursorEntry else { return }
         if entry.isParent {
             goUp()
         } else if entry.isNavigable {
             navigate(to: entry.url)
+        } else {
+            NSWorkspace.shared.open(entry.url)
         }
     }
 

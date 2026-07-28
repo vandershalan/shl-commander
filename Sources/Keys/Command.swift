@@ -5,6 +5,11 @@ import Foundation
 ///
 /// Commands are added in the step that implements them; a name here always does something.
 enum Command: String, CaseIterable, Codable, Sendable {
+    // Viewing
+    case quickLook
+    case viewInternal
+    case editFile
+
     // File operations
     case newFolder
     case newFile
@@ -76,6 +81,9 @@ enum Command: String, CaseIterable, Codable, Sendable {
     /// Menu title. Also what the README's shortcut table prints.
     var title: String {
         switch self {
+        case .quickLook: return "Quick Look"
+        case .viewInternal: return "View as Text"
+        case .editFile: return "Edit"
         case .newFolder: return "New Folder…"
         case .newFile: return "New File…"
         case .copyToOtherPane: return "Copy…"
@@ -142,7 +150,8 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .addFavorite, .showFavorites, .favorite1, .favorite2, .favorite3, .favorite4,
             .favorite5, .favorite6, .favorite7, .favorite8, .favorite9:
             return .favorites
-        case .newFolder, .newFile, .copyToOtherPane, .moveToOtherPane, .duplicate,
+        case .quickLook, .viewInternal, .editFile,
+            .newFolder, .newFile, .copyToOtherPane, .moveToOtherPane, .duplicate,
             .renameInPlace, .moveToTrash, .deletePermanently, .openInTerminal, .revealInFinder,
             .copyPathToClipboard:
             return .file

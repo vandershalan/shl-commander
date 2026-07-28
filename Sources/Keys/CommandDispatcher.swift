@@ -10,6 +10,15 @@ struct CommandDispatcher {
         let panel = state.activePanel
 
         switch command {
+        // Viewing
+        case .quickLook:
+            quickLook(panel)
+        case .viewInternal:
+            guard let entry = panel.actionTargets.first, !entry.isDirectory else { break }
+            InternalViewer.show(entry.url)
+        case .editFile:
+            edit(panel)
+
         // File operations
         case .newFolder:
             createItem(on: panel, directory: true)
@@ -264,6 +273,39 @@ struct CommandDispatcher {
                 OperationFailure(url: url, message: error.localizedDescription)
             ])
         }
+    }
+
+    // MARK: - Viewing
+
+    /// Previews the marked set, or the cursor row when nothing is marked, so the panel's own
+    /// arrows step through exactly the selection.
+    private func quickLook(_ panel: PanelViewModel) {
+        let targets = panel.actionTargets.filter { !$0.isDirectory }
+        guard !targets.isEmpty else { return }
+        let cursorURL = panel.cursorEntry?.url
+        let start = targets.firstIndex { $0.url == cursorURL } ?? 0
+        guard QuickLookController.shared.prepare(targets.map(\.url), startingAt: start) else {
+            return
+        }
+        QuickLookController.shared.toggle()
+    }
+
+    /// Opens in the configured editor, or in whatever the system would use otherwise.
+    private func edit(_ panel: PanelViewModel) {
+        guard let entry = panel.actionTargets.first, !entry.isDirectory else { return }
+        let identifier = UserDefaults.standard.string(forKey: "editorBundleIdentifier")
+        guard
+            let identifier,
+            let application = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier)
+        else {
+            NSWorkspace.shared.open(entry.url)
+            return
+        }
+        NSWorkspace.shared.open(
+            [entry.url],
+            withApplicationAt: application,
+            configuration: NSWorkspace.OpenConfiguration()
+        )
     }
 
     // MARK: - Tabs and favourites

@@ -1,4 +1,5 @@
 import AppKit
+import QuickLookUI
 
 /// `NSTableView` subclass that gives the panel first crack at every key press.
 ///
@@ -17,6 +18,30 @@ final class FileTable: NSTableView {
         let accepted = super.becomeFirstResponder()
         if accepted { onBecomeFirstResponder() }
         return accepted
+    }
+
+    // MARK: - Quick Look
+    //
+    // Quick Look hands control to whoever in the responder chain claims it. The active pane's
+    // table is first responder, so claiming it here is what makes the panel show this pane's
+    // selection rather than nothing at all.
+
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool { true }
+
+    // These NSResponder hooks carry no main-actor annotation, but the panel only ever calls
+    // them on the main thread.
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        MainActor.assumeIsolated {
+            panel.dataSource = QuickLookController.shared
+            panel.delegate = QuickLookController.shared
+        }
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        MainActor.assumeIsolated {
+            panel.dataSource = nil
+            panel.delegate = nil
+        }
     }
 
     /// Rows a Page Up/Down should travel: one screenful less a row of overlap, so the user

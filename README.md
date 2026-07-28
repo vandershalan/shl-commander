@@ -49,6 +49,9 @@ Every command has a Total Commander binding and, where a stock Mac cannot press 
 
 | Command | Total Commander | macOS |
 | --- | --- | --- |
+| Quick Look | `F3` | `⌘Y` |
+| View as text / hex | `⌥F3` | `⌘⇧Y` |
+| Edit | `F4` | `⌘E` |
 | New folder / new file | `F7` / `⇧F4` | `⌘⇧N` / `⌘⇧F` |
 | Copy / move to other pane | `F5` / `F6` | `⌘C` / `⌘M` |
 | Duplicate | `⇧F5` | `⌘D` |
@@ -83,7 +86,13 @@ Every command has a Total Commander binding and, where a stock Mac cannot press 
 | Clear filter | `Esc` | |
 
 Sorting is also available by clicking a column header, and `Backspace` edits an active
-quick filter before it means "go up".
+quick filter before it means "go up". `Return` on a file opens it in whichever app the
+system would use; `F4` opens it in your editor, which defaults to the same thing until you
+set one:
+
+```bash
+defaults write com.szalankiewicz.shl-commander editorBundleIdentifier com.microsoft.VSCode
+```
 
 ### Rebinding
 
