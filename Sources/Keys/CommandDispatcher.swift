@@ -86,6 +86,30 @@ struct CommandDispatcher {
         case .markNone:
             panel.clearMarks()
 
+        // Tabs
+        case .newTab:
+            panel.openTab()
+        case .closeTab:
+            panel.closeActiveTab()
+        case .nextTab:
+            panel.nextTab()
+        case .previousTab:
+            panel.previousTab()
+        case .openInOtherPaneTab:
+            openInOtherPaneTab(from: panel)
+
+        // Favourites
+        case .addFavorite:
+            addFavorite(panel.directory)
+        case .showFavorites:
+            showFavoritesMenu()
+        case .favorite1, .favorite2, .favorite3, .favorite4, .favorite5, .favorite6,
+            .favorite7, .favorite8, .favorite9:
+            guard let number = command.favoriteNumber,
+                let favorite = state.favorites.favorite(number: number)
+            else { break }
+            open(favorite)
+
         // Panes
         case .sendPathToOtherPane:
             state.inactivePanel.navigate(to: panel.directory)
@@ -240,6 +264,69 @@ struct CommandDispatcher {
                 OperationFailure(url: url, message: error.localizedDescription)
             ])
         }
+    }
+
+    // MARK: - Tabs and favourites
+
+    /// Total Commander's Ctrl+Up: send the folder under the cursor to the other pane as a new
+    /// tab, without leaving the pane you are in.
+    private func openInOtherPaneTab(from panel: PanelViewModel) {
+        guard let entry = panel.cursorEntry else { return }
+        let target = entry.isParent || entry.isDirectory ? entry.url : panel.directory
+        state.inactivePanel.openTab(at: target)
+    }
+
+    func open(_ favorite: Favorite) {
+        guard favorite.exists else {
+            OperationPrompts.report([
+                OperationFailure(url: favorite.url, message: "This folder no longer exists.")
+            ])
+            return
+        }
+        state.activePanel.navigate(to: favorite.url)
+    }
+
+    private func addFavorite(_ url: URL) {
+        let suggested = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
+        guard
+            let name = OperationPrompts.askForName(
+                title: "Add to favourites",
+                message: url.path,
+                initial: suggested,
+                buttonTitle: "Add"
+            )
+        else { return }
+        state.favorites.add(url, name: name)
+    }
+
+    /// Popped up from code because a SwiftUI Menu cannot be opened by a keyboard command.
+    private func showFavoritesMenu() {
+        let menu = NSMenu(title: "Favourites")
+        if state.favorites.favorites.isEmpty {
+            let empty = NSMenuItem(title: "No favourites yet", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            menu.addItem(empty)
+        }
+        for (index, favorite) in state.favorites.favorites.enumerated() {
+            let item = NSMenuItem(
+                title: favorite.name,
+                action: #selector(FavoriteMenuTarget.open(_:)),
+                keyEquivalent: index < 9 ? String(index + 1) : ""
+            )
+            item.keyEquivalentModifierMask = .command
+            item.target = state.favoriteMenuTarget
+            item.representedObject = favorite.path
+            item.toolTip = favorite.path
+            item.isEnabled = favorite.exists
+            menu.addItem(item)
+        }
+
+        state.favoriteMenuTarget.onOpen = { [state] path in
+            state.activePanel.navigate(to: URL(fileURLWithPath: path))
+        }
+        let window = NSApp.keyWindow
+        let location = NSPoint(x: 20, y: (window?.contentView?.bounds.height ?? 400) - 20)
+        menu.popUp(positioning: nil, at: location, in: window?.contentView)
     }
 
     // MARK: - Effects

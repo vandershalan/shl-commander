@@ -25,6 +25,7 @@ struct MainCommands: Commands {
         CommandMenu(Command.Section.go.title) { items(in: .go) }
         CommandMenu(Command.Section.view.title) { items(in: .view) }
         CommandMenu(Command.Section.panes.title) { items(in: .panes) }
+        CommandMenu(Command.Section.favorites.title) { items(in: .favorites) }
     }
 
     @ViewBuilder

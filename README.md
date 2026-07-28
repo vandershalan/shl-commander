@@ -49,6 +49,19 @@ Every command has a Total Commander binding and, where a stock Mac cannot press 
 
 | Command | Total Commander | macOS |
 | --- | --- | --- |
+| New folder / new file | `F7` / `⇧F4` | `⌘⇧N` / `⌘⇧F` |
+| Copy / move to other pane | `F5` / `F6` | `⌘C` / `⌘M` |
+| Duplicate | `⇧F5` | `⌘D` |
+| Rename in place | `⇧F6` | `⌘Return` |
+| Move to Trash | `F8` | `⌘⌫` |
+| Delete permanently | `⇧F8` | `⌘⇧⌫` |
+| Measure selected / all folders | `⌃L` / `⌥⇧Return` | `⌘L` / `⌘⇧L` |
+| New tab / close tab | `⌃T` / `⌃W` | `⌘T` / `⌘W` |
+| Next / previous tab | `⌃Tab` / `⌃⇧Tab` | `⌘⇧]` / `⌘⇧[` |
+| Open folder in other pane | `⌃↑` | |
+| Favourites list | `⌃D` | `⌘B` |
+| Add to favourites | | `⌘⇧D` |
+| Jump to favourite 1–9 | | `⌘1`–`⌘9` |
 | Switch pane | `Tab` | |
 | Open | `Return`, keypad `Enter` | |
 | Enclosing folder | `Backspace`, `⌃PageUp` | `⌘↑` |

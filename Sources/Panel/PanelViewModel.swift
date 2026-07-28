@@ -92,6 +92,7 @@ final class PanelViewModel: Identifiable {
         // Symlinks are deliberately left unresolved: the panel shows the path the user asked
         // for, not wherever it happens to point.
         self.directory = directory.standardizedFileURL
+        self.tabs = [PanelTab(url: directory)]
         sizer.onUpdate = { [weak self] in self?.directorySizesChanged() }
     }
 
@@ -190,6 +191,10 @@ final class PanelViewModel: Identifiable {
         }
         directory = url
         filter = ""
+        // Keeps the tab strip's label in step with where the panel actually is.
+        if tabs.indices.contains(activeTabIndex) {
+            tabs[activeTabIndex].path = url.path
+        }
         startWatching()
         load(keeping: selecting)
     }
@@ -233,6 +238,82 @@ final class PanelViewModel: Identifiable {
         case .pageUp(let rows): cursor -= max(1, rows)
         case .pageDown(let rows): cursor += max(1, rows)
         }
+    }
+
+    // MARK: - Tabs
+
+    /// Always at least one. The active tab mirrors whatever the panel is currently showing.
+    private(set) var tabs: [PanelTab] = []
+    private(set) var activeTabIndex = 0
+
+    var hasMultipleTabs: Bool { tabs.count > 1 }
+
+    /// Folds the panel's live state back into the active tab. Called before anything that
+    /// switches away, and before the session is written out.
+    func captureActiveTab() {
+        guard tabs.indices.contains(activeTabIndex) else {
+            tabs = [PanelTab(url: directory, sort: sort, cursorName: cursorEntry?.name)]
+            activeTabIndex = 0
+            return
+        }
+        tabs[activeTabIndex].path = directory.path
+        tabs[activeTabIndex].sort = sort
+        tabs[activeTabIndex].cursorName = cursorEntry?.name
+    }
+
+    func openTab(at url: URL? = nil, activate: Bool = true) {
+        captureActiveTab()
+        let tab = PanelTab(url: url ?? directory, sort: sort)
+        tabs.insert(tab, at: activeTabIndex + 1)
+        if activate {
+            activeTabIndex += 1
+            show(tabs[activeTabIndex])
+        }
+    }
+
+    /// Closing the last tab is refused: a pane always shows something.
+    func closeActiveTab() {
+        guard tabs.count > 1, tabs.indices.contains(activeTabIndex) else { return }
+        tabs.remove(at: activeTabIndex)
+        activeTabIndex = min(activeTabIndex, tabs.count - 1)
+        show(tabs[activeTabIndex])
+    }
+
+    func selectTab(_ index: Int) {
+        guard tabs.indices.contains(index), index != activeTabIndex else { return }
+        captureActiveTab()
+        activeTabIndex = index
+        show(tabs[index])
+    }
+
+    func nextTab() {
+        guard tabs.count > 1 else { return }
+        selectTab((activeTabIndex + 1) % tabs.count)
+    }
+
+    func previousTab() {
+        guard tabs.count > 1 else { return }
+        selectTab((activeTabIndex - 1 + tabs.count) % tabs.count)
+    }
+
+    /// Replaces the panel's contents with a tab's snapshot. Deliberately does not touch
+    /// history: switching tabs is not navigation within a tab.
+    private func show(_ tab: PanelTab) {
+        sort = tab.sort
+        enter(tab.url.standardizedFileURL, selecting: tab.cursorName, recordHistory: false)
+    }
+
+    /// Restores a saved pane, falling back to the current directory if nothing usable is left.
+    func restore(tabs saved: [PanelTab], activeIndex: Int) {
+        let usable = saved.filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !usable.isEmpty else {
+            tabs = [PanelTab(url: directory, sort: sort)]
+            activeTabIndex = 0
+            return
+        }
+        tabs = usable
+        activeTabIndex = min(max(0, activeIndex), usable.count - 1)
+        show(tabs[activeTabIndex])
     }
 
     // MARK: - Renaming

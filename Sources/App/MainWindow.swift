@@ -21,6 +21,12 @@ struct MainWindow: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            FavoritesBarView(
+                store: state.favorites,
+                onOpen: { CommandDispatcher(state: state).open($0) },
+                onAddCurrent: { CommandDispatcher(state: state).perform(.addFavorite) }
+            )
+            Divider()
             panes
             if let progress = state.operations.progress {
                 Divider()

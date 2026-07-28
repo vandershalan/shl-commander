@@ -8,7 +8,7 @@ enum SortKey: String, CaseIterable, Codable, Sendable {
 
 /// Panel sort state. Directories group ahead of files the way Total Commander does,
 /// and the `..` row always wins regardless of key or direction.
-struct SortOrder: Equatable, Codable, Sendable {
+struct SortOrder: Hashable, Codable, Sendable {
     var key: SortKey = .name
     var ascending: Bool = true
     var directoriesFirst: Bool = true

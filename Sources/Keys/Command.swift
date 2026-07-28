@@ -43,6 +43,26 @@ enum Command: String, CaseIterable, Codable, Sendable {
     case markAll
     case markNone
 
+    // Tabs
+    case newTab
+    case closeTab
+    case nextTab
+    case previousTab
+    case openInOtherPaneTab
+
+    // Favourites
+    case addFavorite
+    case showFavorites
+    case favorite1
+    case favorite2
+    case favorite3
+    case favorite4
+    case favorite5
+    case favorite6
+    case favorite7
+    case favorite8
+    case favorite9
+
     // Panes
     case sendPathToOtherPane
     case takePathFromOtherPane
@@ -86,6 +106,16 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .invertMarks: return "Invert Marks"
         case .markAll: return "Mark All"
         case .markNone: return "Mark None"
+        case .newTab: return "New Tab"
+        case .closeTab: return "Close Tab"
+        case .nextTab: return "Next Tab"
+        case .previousTab: return "Previous Tab"
+        case .openInOtherPaneTab: return "Open in Other Pane"
+        case .addFavorite: return "Add to Favourites"
+        case .showFavorites: return "Favourites…"
+        case .favorite1, .favorite2, .favorite3, .favorite4, .favorite5, .favorite6,
+            .favorite7, .favorite8, .favorite9:
+            return "Favourite \(favoriteNumber ?? 0)"
         case .sendPathToOtherPane: return "Send Path to Other Pane"
         case .takePathFromOtherPane: return "Take Path from Other Pane"
         case .swapPanes: return "Swap Panes"
@@ -106,8 +136,12 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .markToggle, .markToggleAndAdvance, .markByPattern, .unmarkByPattern, .invertMarks,
             .markAll, .markNone:
             return .mark
-        case .sendPathToOtherPane, .takePathFromOtherPane, .swapPanes:
+        case .sendPathToOtherPane, .takePathFromOtherPane, .swapPanes, .newTab, .closeTab,
+            .nextTab, .previousTab, .openInOtherPaneTab:
             return .panes
+        case .addFavorite, .showFavorites, .favorite1, .favorite2, .favorite3, .favorite4,
+            .favorite5, .favorite6, .favorite7, .favorite8, .favorite9:
+            return .favorites
         case .newFolder, .newFile, .copyToOtherPane, .moveToOtherPane, .duplicate,
             .renameInPlace, .moveToTrash, .deletePermanently, .openInTerminal, .revealInFinder,
             .copyPathToClipboard:
@@ -115,8 +149,25 @@ enum Command: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// 1-9 for the numbered favourite commands, nil for everything else. Lets one dispatcher
+    /// branch cover all nine rather than repeating it nine times.
+    var favoriteNumber: Int? {
+        switch self {
+        case .favorite1: return 1
+        case .favorite2: return 2
+        case .favorite3: return 3
+        case .favorite4: return 4
+        case .favorite5: return 5
+        case .favorite6: return 6
+        case .favorite7: return 7
+        case .favorite8: return 8
+        case .favorite9: return 9
+        default: return nil
+        }
+    }
+
     enum Section: String, CaseIterable, Sendable {
-        case file, mark, go, view, panes
+        case file, mark, go, view, panes, favorites
 
         var title: String {
             switch self {
@@ -125,6 +176,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
             case .go: return "Go"
             case .view: return "View"
             case .panes: return "Panes"
+            case .favorites: return "Favourites"
             }
         }
     }

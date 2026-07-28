@@ -12,6 +12,10 @@ struct PanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if panel.hasMultipleTabs {
+                TabStripView(panel: panel, isActive: isActive, onActivate: onActivate)
+                Divider()
+            }
             pathBar
             Divider()
             FileTableView(
