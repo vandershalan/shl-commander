@@ -51,7 +51,7 @@ final class PanelViewModel: Identifiable {
     var showHidden: Bool = false {
         didSet {
             guard showHidden != oldValue else { return }
-            load(keeping: cursorEntry?.name)
+            load(holdingCursor())
         }
     }
 
@@ -60,7 +60,7 @@ final class PanelViewModel: Identifiable {
     var filter: String = "" {
         didSet {
             guard filter != oldValue else { return }
-            rebuildVisible(keeping: cursorEntry?.name)
+            rebuildVisible(holdingCursor())
         }
     }
 
@@ -197,7 +197,7 @@ final class PanelViewModel: Identifiable {
             tabs[activeTabIndex].path = url.path
         }
         startWatching()
-        load(keeping: selecting)
+        load(.named(selecting))
     }
 
     /// A watcher is bound to one path, so it is replaced whenever the panel moves.
@@ -211,7 +211,9 @@ final class PanelViewModel: Identifiable {
     /// Re-reads the current directory. Holds the cursor on the same name by default, or moves
     /// it to `selecting` — used to land on a folder or file just created.
     func reload(selecting: String? = nil) {
-        load(keeping: selecting ?? cursorEntry?.name)
+        // Without an explicit target this is a refresh, not a move, so the cursor holds its
+        // place — that is what keeps it put after a copy, move, or delete.
+        load(selecting.map(CursorTarget.named) ?? holdingCursor())
     }
 
     /// Opens the row under the cursor: directories are entered, files are handed to the
@@ -419,7 +421,7 @@ final class PanelViewModel: Identifiable {
         await loadTask?.value
     }
 
-    private func load(keeping name: String?) {
+    private func load(_ cursorTarget: CursorTarget) {
         let target = directory
         let includeHidden = showHidden
 
@@ -430,7 +432,7 @@ final class PanelViewModel: Identifiable {
             guard let self, !Task.isCancelled else { return }
             // A newer navigation may have landed while this listing was in flight.
             guard self.directory.path == target.path else { return }
-            self.apply(outcome, keeping: name)
+            self.apply(outcome, cursorTarget)
         }
     }
 
@@ -443,7 +445,7 @@ final class PanelViewModel: Identifiable {
         }
     }
 
-    private func apply(_ outcome: ListingOutcome, keeping name: String?) {
+    private func apply(_ outcome: ListingOutcome, _ target: CursorTarget) {
         isLoading = false
         freeSpace = (try? directory.resourceValues(forKeys: [.volumeAvailableCapacityKey]))
             .flatMap(\.volumeAvailableCapacity).map(Int64.init)
@@ -459,17 +461,17 @@ final class PanelViewModel: Identifiable {
             sizer.prune(against: rows)
             // Drop marks for anything that no longer exists.
             marks.formIntersection(Set(rows.map(\.url)))
-            rebuildVisible(keeping: name)
+            rebuildVisible(target)
         case .failed(let message):
             allEntries = []
             marks = []
             loadError = message
-            rebuildVisible(keeping: nil)
+            rebuildVisible(target)
         }
     }
 
     private func resort() {
-        let name = cursorEntry?.name
+        let target = holdingCursor()
         let parentRow = allEntries.first(where: \.isParent)
         var rows = sort.sorted(
             allEntries.filter { !$0.isParent },
@@ -477,26 +479,79 @@ final class PanelViewModel: Identifiable {
         )
         if let parentRow { rows.insert(parentRow, at: 0) }
         allEntries = rows
-        rebuildVisible(keeping: name)
+        rebuildVisible(target)
     }
 
-    private func rebuildVisible(keeping name: String?) {
+    private func rebuildVisible(_ target: CursorTarget) {
         let needle = filter.lowercased()
         entries =
             needle.isEmpty
             ? allEntries
             : allEntries.filter { $0.isParent || $0.name.lowercased().contains(needle) }
         listingID = UUID()
-        restoreCursor(to: name)
+        restoreCursor(target)
     }
 
-    /// Holds the cursor on the same *name* across reloads, re-sorts, and filter changes;
-    /// falls back to the first row when that name is no longer visible.
-    private func restoreCursor(to name: String?) {
-        guard let name, let index = entries.firstIndex(where: { $0.name == name }) else {
-            cursor = 0
-            return
-        }
-        cursor = index
+    /// Snapshot of what is on screen right now, so a rebuild can put the cursor back where it
+    /// was. Must be taken before `entries` is replaced.
+    private func holdingCursor() -> CursorTarget {
+        .hold(previousNames: entries.map(\.name), previousIndex: cursorStorage)
     }
+
+    private func restoreCursor(_ target: CursorTarget) {
+        switch target {
+        case .named(let name):
+            guard let name, let index = entries.firstIndex(where: { $0.name == name }) else {
+                cursor = 0
+                return
+            }
+            cursor = index
+
+        case .hold(let previousNames, let previousIndex):
+            guard !previousNames.isEmpty else {
+                cursor = 0
+                return
+            }
+            let start = min(max(0, previousIndex), previousNames.count - 1)
+
+            // The same row, if it is still there. Covers the common case where an operation
+            // changed something else in the directory.
+            if let index = entries.firstIndex(where: { $0.name == previousNames[start] }) {
+                cursor = index
+                return
+            }
+
+            // The row is gone, so hand the cursor to the nearest surviving row above where it
+            // was. Walking rather than simply stepping back one place matters for a bulk
+            // delete, where the whole block above the cursor may have gone too.
+            //
+            // The ".." row is skipped: after deleting a file, dropping the cursor onto
+            // "enclosing folder" would put Return one keystroke away from leaving the
+            // directory.
+            var probe = start - 1
+            while probe >= 0 {
+                let name = previousNames[probe]
+                if name != ".." , let index = entries.firstIndex(where: { $0.name == name }) {
+                    cursor = index
+                    return
+                }
+                probe -= 1
+            }
+
+            // Nothing above survived, so the row that went was the topmost one. Take whatever
+            // moved up into its place; only an emptied directory falls through to "..".
+            cursor = entries.firstIndex { !$0.isParent } ?? 0
+        }
+    }
+}
+
+/// Where the cursor should end up once the row set has been rebuilt.
+private enum CursorTarget {
+    /// Land on this name, or on the first row when it is not there. For moves the user asked
+    /// for: entering a directory, or landing on something just created or renamed.
+    case named(String?)
+    /// Do not move. Stay on the same row, and if it has gone, take the nearest surviving row
+    /// above where it was. For reloads, re-sorts, and filter changes — nothing there is a
+    /// request to move the cursor.
+    case hold(previousNames: [String], previousIndex: Int)
 }

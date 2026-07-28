@@ -93,7 +93,7 @@ struct FileTableView: NSViewRepresentable {
             controller.marks = marks
             controller.directorySizes = directorySizes
             controller.measuringDirectories = measuringDirectories
-            table.reloadData()
+            controller.reloadRows(on: table)
         } else if controller.marks != marks
             || controller.directorySizes != directorySizes
             || controller.measuringDirectories != measuringDirectories

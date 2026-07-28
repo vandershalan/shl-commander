@@ -321,6 +321,18 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
 
     // MARK: - Pushing SwiftUI state into AppKit
 
+    /// Reloads every row with the selection callback muted.
+    ///
+    /// `reloadData` adjusts the selection itself when the row count shrinks, and that
+    /// adjustment arrives as `tableViewSelectionDidChange` — indistinguishable from the user
+    /// clicking a row. Left unmuted it overwrites the cursor position the panel just restored
+    /// after a delete, with the model and the table then disagreeing about where the cursor is.
+    func reloadRows(on table: NSTableView) {
+        isSyncingSelection = true
+        table.reloadData()
+        isSyncingSelection = false
+    }
+
     func syncCursor(_ cursor: Int, on table: NSTableView) {
         guard entries.indices.contains(cursor), table.selectedRow != cursor else { return }
         isSyncingSelection = true
