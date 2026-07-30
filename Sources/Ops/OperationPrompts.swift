@@ -46,23 +46,21 @@ struct OperationPrompts: ConflictPrompting {
         }
     }
 
-    /// Confirms a permanent delete. Anything recursive or bulk demands the word "delete" be
-    /// typed, because unlike a trash move there is nothing to undo.
-    static func confirmPermanentDelete(_ targets: [FileEntry]) -> Bool {
-        let directories = targets.count(where: \.isDirectory)
-        let needsTyping = targets.count > 10 || directories > 0
+    /// Confirms a delete, listing exactly what is about to go.
+    ///
+    /// Both kinds ask, because a mistaken Trash move still has to be hunted down and put back.
+    /// A permanent delete of a folder or of more than ten items additionally demands the word
+    /// "delete" be typed, since there is nothing to undo.
+    static func confirmDelete(_ targets: [FileEntry], toTrash: Bool) -> Bool {
+        guard !targets.isEmpty else { return false }
+
+        let summary = deleteSummary(targets, toTrash: toTrash)
+        let needsTyping = deleteNeedsTypedConfirmation(targets, toTrash: toTrash)
 
         let alert = NSAlert()
-        alert.alertStyle = .critical
-        alert.messageText = targets.count == 1
-            ? "Permanently delete \u{22}\(targets[0].name)\u{22}?"
-            : "Permanently delete \(targets.count) items?"
-
-        var detail = "This cannot be undone. The Trash is not involved."
-        if directories > 0 {
-            detail += "\n\n\(directories) folder\(directories == 1 ? "" : "s") and everything inside will be removed."
-        }
-        alert.informativeText = detail
+        alert.alertStyle = toTrash ? .warning : .critical
+        alert.messageText = summary.headline
+        alert.informativeText = summary.detail
 
         var field: NSTextField?
         if needsTyping {
@@ -75,12 +73,76 @@ struct OperationPrompts: ConflictPrompting {
             field = input
         }
 
-        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: toTrash ? "Move to Trash" : "Delete")
         alert.addButton(withTitle: "Cancel")
+        // Escape and ⌘. cancel, so a stray Return cannot confirm a destructive dialog by
+        // reflex alone.
+        alert.buttons[1].keyEquivalent = "\u{1b}"
 
         guard alert.runModal() == .alertFirstButtonReturn else { return false }
         guard let field else { return true }
         return field.stringValue.trimmingCharacters(in: .whitespaces).lowercased() == "delete"
+    }
+
+    /// The two strings a delete confirmation shows. Built separately from the dialog so the
+    /// wording and the counts can be tested without putting a window on screen.
+    struct DeleteSummary: Equatable, Sendable {
+        let headline: String
+        let detail: String
+    }
+
+    /// Typing is demanded for a permanent delete of a folder or of a large batch — the cases
+    /// where a reflex Return would destroy the most. A trash move never demands it.
+    static func deleteNeedsTypedConfirmation(_ targets: [FileEntry], toTrash: Bool) -> Bool {
+        guard !toTrash else { return false }
+        return targets.count > 10 || targets.contains(where: \.isDirectory)
+    }
+
+    /// Long lists are capped so the dialog cannot grow past the screen.
+    static func deleteSummary(_ targets: [FileEntry], toTrash: Bool) -> DeleteSummary {
+        let folders = targets.count(where: \.isDirectory)
+        let files = targets.count - folders
+
+        let verb = toTrash ? "Move" : "Permanently delete"
+        let suffix = toTrash ? " to the Trash?" : "?"
+        let what = targets.count == 1
+            ? "\u{22}\(targets.first?.name ?? "")\u{22}"
+            : "\(targets.count) items"
+
+        var lines: [String] = []
+
+        var counts: [String] = []
+        if files > 0 { counts.append("\(files) file\(files == 1 ? "" : "s")") }
+        if folders > 0 { counts.append("\(folders) folder\(folders == 1 ? "" : "s")") }
+
+        // Only files have a size to hand. Measuring a folder's contents means walking it,
+        // which is far too slow to do while the user waits on a dialog.
+        let bytes = targets.filter { !$0.isDirectory }.reduce(Int64(0)) { $0 + $1.size }
+        var totals = counts.joined(separator: ", ")
+        if bytes > 0 { totals += " · \(Formatters.size(bytes))" }
+        if folders > 0 { totals += " (folder contents included)" }
+        lines.append(totals)
+
+        let shown = 12
+        lines.append("")
+        for target in targets.prefix(shown) {
+            lines.append(target.isDirectory ? "\(target.name)/" : target.name)
+        }
+        if targets.count > shown {
+            lines.append("… and \(targets.count - shown) more")
+        }
+
+        lines.append("")
+        lines.append(
+            toTrash
+                ? "Items can be put back from the Trash."
+                : "This cannot be undone. The Trash is not involved."
+        )
+
+        return DeleteSummary(
+            headline: "\(verb) \(what)\(suffix)",
+            detail: lines.joined(separator: "\n")
+        )
     }
 
     /// Used for New Folder, New File, and Rename.

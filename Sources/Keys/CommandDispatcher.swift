@@ -68,7 +68,7 @@ struct CommandDispatcher {
             state.left.showHidden = showing
             state.right.showHidden = showing
         case .clearFilter:
-            panel.filter = ""
+            panel.stopFiltering()
         case .measureSelectedDirectories:
             panel.measureSelectedDirectories()
         case .measureAllDirectories:
@@ -145,7 +145,7 @@ struct CommandDispatcher {
         switch command {
         case .historyBack: return panel.canGoBack
         case .historyForward: return panel.canGoForward
-        case .clearFilter: return !panel.filter.isEmpty
+        case .clearFilter: return panel.isFiltering
         case .markNone, .invertMarks: return !panel.entries.isEmpty
         case .goUp: return DirectoryLister.parent(of: panel.directory) != nil
         default: return true
@@ -232,9 +232,9 @@ struct CommandDispatcher {
     private func delete(on panel: PanelViewModel, toTrash: Bool) {
         let targets = panel.actionTargets
         guard !targets.isEmpty, !state.operations.isRunning else { return }
-        // A trash move is recoverable from the Finder, so it needs no confirmation. A
-        // permanent delete is not.
-        if !toTrash, !OperationPrompts.confirmPermanentDelete(targets) { return }
+        // Both kinds confirm, listing what is about to go: a mistaken Trash move is
+        // recoverable, but only once you work out what disappeared.
+        guard OperationPrompts.confirmDelete(targets, toTrash: toTrash) else { return }
 
         state.operations.startDeletion(of: targets.map(\.url), toTrash: toTrash)
     }

@@ -51,6 +51,14 @@ struct PanelView: View {
                 },
                 onKeyDown: onKeyDown
             )
+            if panel.isFiltering {
+                Divider()
+                FilterBarView(
+                    text: panel.filter,
+                    matchCount: panel.entries.count(where: { !$0.isParent }),
+                    isActive: isActive
+                )
+            }
             Divider()
             footer
         }
@@ -133,12 +141,6 @@ struct PanelView: View {
                 }
             }
             Spacer(minLength: 0)
-            if !panel.filter.isEmpty {
-                Label(panel.filter, systemImage: "line.3.horizontal.decrease")
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(Color.accentColor.opacity(0.25), in: Capsule())
-            }
         }
         .font(.system(size: 11))
         .foregroundStyle(.secondary)

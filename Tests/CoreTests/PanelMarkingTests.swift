@@ -118,16 +118,16 @@ struct PanelMarkingTests {
         defer { tree.remove() }
         let panel = try await panel(in: tree)
 
-        panel.filter = "ta"
+        panel.setFilter("ta")
         #expect(panel.entries.map(\.name) == ["..", "beta.txt"])
 
-        panel.filter = "TA"  // case-insensitive
+        panel.setFilter("TA")  // case-insensitive
         #expect(panel.entries.map(\.name) == ["..", "beta.txt"])
 
-        panel.filter = "zzz"
+        panel.setFilter("zzz")
         #expect(panel.entries.map(\.name) == [".."])
 
-        panel.filter = ""
+        panel.stopFiltering()
         #expect(panel.entries.count == 5)
     }
 
@@ -140,11 +140,11 @@ struct PanelMarkingTests {
         panel.markAll()
         #expect(panel.markedCount == 4)
 
-        panel.filter = "alpha"
+        panel.setFilter("alpha")
         #expect(panel.markedCount == 1)  // only the visible one is actionable
         #expect(panel.marks.count == 4)  // but the marks themselves are intact
 
-        panel.filter = ""
+        panel.stopFiltering()
         #expect(panel.markedCount == 4)
     }
 
@@ -155,7 +155,7 @@ struct PanelMarkingTests {
         try tree.file("sub/inner.txt", bytes: 1)
         let panel = try await panel(in: tree)
 
-        panel.filter = "sub"
+        panel.setFilter("sub")
         panel.cursor = 1
         panel.openCursor()
         await panel.settle()

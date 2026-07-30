@@ -224,10 +224,10 @@ struct CursorPersistenceTests {
         try park(panel, on: "c.txt")
 
         // "b" excludes c.txt, and nothing above it survives except the parent row.
-        panel.filter = "b"
+        panel.setFilter("b")
         #expect(panel.cursorEntry?.name == "b.txt")
 
-        panel.filter = ""
+        panel.stopFiltering()
         #expect(panel.cursorEntry?.name == "b.txt", "clearing the filter does not jump either")
     }
 

@@ -178,7 +178,7 @@ struct CommandDispatcherTests {
         defer { f.remove() }
 
         #expect(f.dispatcher.isEnabled(.clearFilter) == false)
-        f.state.left.filter = "a"
+        f.state.left.setFilter("a")
         #expect(f.dispatcher.isEnabled(.clearFilter))
 
         f.dispatcher.perform(.clearFilter)

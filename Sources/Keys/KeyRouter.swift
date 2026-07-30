@@ -23,13 +23,18 @@ struct KeyRouter {
 
         let panel = state.activePanel
 
-        // Backspace edits an active filter and only otherwise means "go up". Checked ahead of
-        // the keymap because the meaning is contextual, not a rebindable binding of its own.
+        // Backspace belongs to the filter for as long as a filter session is open, and only
+        // means "go up" outside one. Checked ahead of the keymap because the meaning is
+        // contextual, not a rebindable binding of its own.
+        //
+        // Deliberately keyed on the session rather than on the filter still having text:
+        // otherwise backspacing away the last character would hand the very next Backspace to
+        // "go up", and clearing a filter would walk you out of the directory.
         if event.keyCode == Self.backspaceKeyCode,
             event.modifierFlags.intersection(KeyChord.significant).isEmpty,
-            !panel.filter.isEmpty
+            panel.isFiltering
         {
-            panel.filter = String(panel.filter.dropLast())
+            panel.deleteFilterCharacter()
             return true
         }
 
@@ -46,7 +51,7 @@ struct KeyRouter {
             let character = characters.first,
             Self.isFilterable(character)
         {
-            panel.filter.append(character)
+            panel.appendToFilter(character)
             return true
         }
 

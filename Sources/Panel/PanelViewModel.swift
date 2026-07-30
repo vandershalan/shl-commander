@@ -57,11 +57,42 @@ final class PanelViewModel: Identifiable {
 
     /// Case-insensitive substring match on the name. The `..` row is never filtered out,
     /// so there is always a way back.
-    var filter: String = "" {
+    private(set) var filter: String = "" {
         didSet {
             guard filter != oldValue else { return }
             rebuildVisible(holdingCursor())
         }
+    }
+
+    /// True from the first typed character until Escape or a directory change.
+    ///
+    /// Tracked separately from `filter` being non-empty so that backspacing the last character
+    /// does not silently hand the next Backspace to "go up": deleting your way back to an empty
+    /// filter should leave you in the directory, not one level above it.
+    private(set) var isFiltering = false
+
+    func appendToFilter(_ character: Character) {
+        isFiltering = true
+        filter.append(character)
+    }
+
+    /// Backspace inside the filter. A no-op once the filter is empty, which is the point.
+    func deleteFilterCharacter() {
+        guard isFiltering, !filter.isEmpty else { return }
+        filter.removeLast()
+    }
+
+    /// Sets the whole filter text at once, as though it had been typed. Non-empty text opens a
+    /// session; use `stopFiltering()` to close one.
+    func setFilter(_ text: String) {
+        if !text.isEmpty { isFiltering = true }
+        filter = text
+    }
+
+    /// Ends the filter session and shows everything again.
+    func stopFiltering() {
+        isFiltering = false
+        filter = ""
     }
 
     /// Index into `entries`, clamped so it can never dangle past the end.
@@ -191,6 +222,9 @@ final class PanelViewModel: Identifiable {
             if backStack.count > Self.historyLimit { backStack.removeFirst() }
         }
         directory = url
+        // A directory change ends the filter session outright: the text no longer describes
+        // anything on screen.
+        isFiltering = false
         filter = ""
         // Keeps the tab strip's label in step with where the panel actually is.
         if tabs.indices.contains(activeTabIndex) {

@@ -86,8 +86,16 @@ Every command has a Total Commander binding and, where a stock Mac cannot press 
 | Copy path | `⌃⇧Return` | `⌘⌥C` |
 | Clear filter | `Esc` | |
 
-Sorting is also available by clicking a column header, and `Backspace` edits an active
-quick filter before it means "go up". `Return` on a file opens it in whichever app the
+Sorting is also available by clicking a column header.
+
+Typing any printable character starts a quick filter, shown in a bar at the foot of the pane
+with a live match count. `Backspace` edits that filter for as long as the bar is showing —
+including once the text is empty — so clearing a filter never walks you out of the directory.
+`Esc` closes the bar, and only then does `Backspace` mean "enclosing folder" again.
+
+Deleting always asks first, listing what is about to go: how many files and folders, their
+total size, and the names themselves. Permanently deleting a folder, or more than ten items,
+additionally requires typing the word `delete`. `Return` on a file opens it in whichever app the
 system would use; `F4` opens it in your editor, which defaults to the same thing until you
 set one:
 
