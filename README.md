@@ -26,6 +26,10 @@ cursor that never wanders, marks kept separate from the cursor, and a command fo
 - Quick Look (`F3`), an internal text/hex viewer, Open in Terminal, Reveal in Finder.
 - **A searchable shortcut list** (`F1` or `⌘/`), built from the live keymap, so it cannot fall
   out of step with what the keys actually do.
+- **Browse inside archives.** `Return` on a `.zip`, `.tar.gz`, `.7z` and friends opens it like a
+  folder: navigate down, filter, mark, preview with Quick Look, and copy files out. Folders
+  inside an archive show their real recursive size straight away, since the archive already
+  lists it.
 
 ## Requirements
 
@@ -141,6 +145,28 @@ additionally requires typing the word `delete`.
 `Return` on a file opens it in whichever app the system would use; `F4` opens it in your
 editor, chosen in Settings.
 
+### Archives
+
+`Return` on an archive enters it, and from there everything works as it does in a folder:
+arrows and `Return` navigate down, `Backspace` climbs back out — leaving the archive puts the
+cursor back on the archive file — and filtering, marking, sorting, Quick Look and the internal
+viewer all behave normally. Nested archives open in turn.
+
+`F5` copies the selection out. It asks for a destination, extracts through a staging directory
+inside it, and resolves name clashes with the same dialog a normal copy uses. Previewing or
+opening a member extracts a scratch copy under the system temporary directory, which is removed
+on quit.
+
+**Archives are read-only.** Creating, renaming, moving and deleting inside one are refused with
+a message rather than half-done, and edits to an opened member are not written back. Copy the
+files out, change them, and repack.
+
+Recognised: `zip` (including `jar`, `war`, `ipa`, `cbz`), `tar`, `tar.gz`/`tgz`,
+`tar.bz2`/`tbz`, `tar.xz`/`txz`, `tar.zst`, `7z`, `rar`/`cbr`, `cpio`, `iso`. A bare `.gz` or
+`.xz` is not included: it is a single compressed stream, not a container, so there is nothing to
+navigate. Reading is done by `/usr/bin/tar`, which on macOS is bsdtar over libarchive — no
+third-party archive library is vendored.
+
 ### Rebinding
 
 **Settings → Keyboard** (`⌘,`) lists every command with its keys. Select one, press *Record
@@ -190,6 +216,7 @@ and rereads it at launch.
 ```
 Sources/
   App/        SwiftUI app, window, menu bar, preferences, session
+  Archive/    format detection, listing via bsdtar, index, extraction cache
   Core/       listing, sorting, icons, FSEvents, volumes, directory sizes
   Keys/       KeyChord, Keymap, KeyRouter, CommandDispatcher
   Ops/        copy/move engine, operation queue, conflict resolution, prompts
@@ -211,8 +238,8 @@ granted to one.
 
 ## Not implemented
 
-Directory synchronise, multi-rename tool, zip/unzip, compare by content, branch view, and
-remote (SFTP) panels.
+Writing into archives (creating one, or adding to and deleting from an existing one), directory
+synchronise, multi-rename tool, compare by content, branch view, and remote (SFTP) panels.
 
 There is no CI workflow: GitHub's macOS runners do not yet ship an Xcode that can build a
 macOS 26 target, so one would only ever be red. Run `make test` locally.

@@ -25,8 +25,17 @@ enum CursorMove: Sendable {
 final class PanelViewModel: Identifiable {
     let id = UUID()
 
-    private(set) var directory: URL
-    /// Everything the directory holds, sorted, including the `..` row.
+    /// Where the pane is looking: a directory on disk, or a path inside an archive.
+    private(set) var location: PanelLocation
+
+    /// The real directory the pane sits in or under. Inside an archive this is the folder
+    /// holding the archive file, which is what commands needing somewhere real should use.
+    var directory: URL { location.containingDirectory }
+
+    var isInsideArchive: Bool { location.isInsideArchive }
+    var displayPath: String { location.displayPath }
+
+    /// Everything the location holds, sorted, including the `..` row.
     private(set) var allEntries: [FileEntry] = []
     /// What the table shows — `allEntries` minus anything the quick filter excludes.
     private(set) var entries: [FileEntry] = []
@@ -109,8 +118,8 @@ final class PanelViewModel: Identifiable {
     private var loadTask: Task<Void, Never>?
 
     private static let historyLimit = 100
-    private var backStack: [URL] = []
-    private var forwardStack: [URL] = []
+    private var backStack: [PanelLocation] = []
+    private var forwardStack: [PanelLocation] = []
 
     /// Recreated on every directory change; nil when the OS refused a stream.
     private var watcher: FSEventsWatcher?
@@ -123,8 +132,8 @@ final class PanelViewModel: Identifiable {
         // Standardised on the way in so `enter` never sees two spellings of one directory.
         // Symlinks are deliberately left unresolved: the panel shows the path the user asked
         // for, not wherever it happens to point.
-        self.directory = directory.standardizedFileURL
-        self.tabs = [PanelTab(url: directory)]
+        self.location = .directory(directory.standardizedFileURL)
+        self.tabs = [PanelTab(location: .directory(directory.standardizedFileURL))]
         sizer.onUpdate = { [weak self] in self?.directorySizesChanged() }
     }
 
@@ -138,14 +147,20 @@ final class PanelViewModel: Identifiable {
         }
     }
 
+    /// Shown wherever a write is attempted inside an archive.
+    static let readOnlyArchiveMessage = "Archives are read-only. Copy the files out first."
+
     /// Measures the marked directories, or the cursor directory when nothing is marked.
+    ///
+    /// Archive members are skipped: their sizes already came from the archive's table of
+    /// contents, and there is no tree on disk to walk.
     func measureSelectedDirectories() {
-        sizer.request(actionTargets.filter(\.isDirectory))
+        sizer.request(actionTargets.filter { $0.isDirectory && !$0.isArchiveMember })
     }
 
     /// Measures every directory in the pane.
     func measureAllDirectories() {
-        sizer.request(entries)
+        sizer.request(entries.filter { !$0.isArchiveMember })
     }
 
     /// Directories currently being measured, so their Size cell can show progress.
@@ -184,7 +199,7 @@ final class PanelViewModel: Identifiable {
 
     /// Enters `url`. The cursor lands on `selecting` when given, otherwise on the first row.
     func navigate(to url: URL, selecting: String? = nil) {
-        enter(url.standardizedFileURL, selecting: selecting, recordHistory: true)
+        go(to: .directory(url.standardizedFileURL), selecting: selecting, recordHistory: true)
     }
 
     /// Jumps to the root of the volume the panel is currently on, which for the boot volume
@@ -194,41 +209,53 @@ final class PanelViewModel: Identifiable {
         navigate(to: volume ?? URL(fileURLWithPath: "/"))
     }
 
+    /// Opens an archive and shows its root, as though it were a folder.
+    ///
+    /// The archive's URL is canonicalised on the way in, so the same file reached by different
+    /// spellings of its path is one location and shares one cached listing.
+    func enterArchive(_ archive: URL, path: String = "") {
+        go(
+            to: .archive(archive: archive.canonicalFileURL, path: path),
+            selecting: nil,
+            recordHistory: true
+        )
+    }
+
     var canGoBack: Bool { !backStack.isEmpty }
     var canGoForward: Bool { !forwardStack.isEmpty }
 
     func historyBack() {
         guard let previous = backStack.popLast() else { return }
-        forwardStack.append(directory)
-        enter(previous, selecting: nil, recordHistory: false)
+        forwardStack.append(location)
+        go(to: previous, selecting: nil, recordHistory: false)
     }
 
     func historyForward() {
         guard let next = forwardStack.popLast() else { return }
-        backStack.append(directory)
-        enter(next, selecting: nil, recordHistory: false)
+        backStack.append(location)
+        go(to: next, selecting: nil, recordHistory: false)
     }
 
     /// Single funnel for every directory change, so history and filter reset behave the same
     /// no matter which command triggered the move.
-    private func enter(_ url: URL, selecting: String?, recordHistory: Bool) {
-        // Compared by path, not by URL: `standardizedFileURL` marks an existing directory
-        // with a trailing slash, so two URLs for the same folder compare unequal and every
-        // "reload where I already am" would push a bogus history entry and wipe the
+    private func go(to target: PanelLocation, selecting: String?, recordHistory: Bool) {
+        // Compared through `isSamePlace`, not by URL: `standardizedFileURL` marks an existing
+        // directory with a trailing slash, so two URLs for the same folder compare unequal and
+        // every "reload where I already am" would push a bogus history entry and wipe the
         // forward stack.
-        if recordHistory, url.path != directory.path {
-            backStack.append(directory)
+        if recordHistory, !target.isSamePlace(as: location) {
+            backStack.append(location)
             forwardStack.removeAll()
             if backStack.count > Self.historyLimit { backStack.removeFirst() }
         }
-        directory = url
-        // A directory change ends the filter session outright: the text no longer describes
+        location = target
+        // A change of location ends the filter session outright: the text no longer describes
         // anything on screen.
         isFiltering = false
         filter = ""
         // Keeps the tab strip's label in step with where the panel actually is.
         if tabs.indices.contains(activeTabIndex) {
-            tabs[activeTabIndex].path = url.path
+            tabs[activeTabIndex].setLocation(target)
         }
         startWatching()
         load(.named(selecting))
@@ -236,6 +263,8 @@ final class PanelViewModel: Identifiable {
 
     /// A watcher is bound to one path, so it is replaced whenever the panel moves.
     private func startWatching() {
+        // Inside an archive this watches the folder holding it, so rebuilding the archive
+        // shows up as a reload rather than a stale listing.
         watcher = FSEventsWatcher(watching: directory) { [weak self] in
             // Cursor position and marks survive because reload keys them by name and URL.
             self?.reload()
@@ -250,23 +279,67 @@ final class PanelViewModel: Identifiable {
         load(selecting.map(CursorTarget.named) ?? holdingCursor())
     }
 
-    /// Opens the row under the cursor: directories are entered, files are handed to the
-    /// system, which launches whatever is registered for them.
+    /// Opens the row under the cursor: directories and archives are entered, files are handed
+    /// to the system, which launches whatever is registered for them.
+    ///
+    /// A file inside an archive has to be pulled out to a scratch copy before anything can open
+    /// it, and that copy is read-only in effect: edits are never written back.
     func openCursor() {
         guard let entry = cursorEntry else { return }
+
         if entry.isParent {
             goUp()
-        } else if entry.isNavigable {
+            return
+        }
+
+        if let origin = entry.archive {
+            openArchiveMember(entry, origin: origin)
+            return
+        }
+
+        if entry.isDirectory {
             navigate(to: entry.url)
+        } else if entry.isBrowsableArchive {
+            enterArchive(entry.url)
         } else {
             NSWorkspace.shared.open(entry.url)
         }
     }
 
-    /// Ascends one level, parking the cursor on the directory just left.
+    /// Handles a row that lives inside an archive.
+    private func openArchiveMember(_ entry: FileEntry, origin: ArchiveOrigin) {
+        if entry.isDirectory {
+            go(
+                to: .archive(archive: origin.archive, path: origin.member),
+                selecting: nil,
+                recordHistory: true
+            )
+            return
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let extracted = try await ArchiveStore.shared.materialise(
+                    member: origin.member, from: origin.archive)
+                // A nested archive opens as an archive rather than being handed to the system,
+                // so browsing keeps working all the way down.
+                if entry.isBrowsableArchive {
+                    self.enterArchive(extracted)
+                } else {
+                    NSWorkspace.shared.open(extracted)
+                }
+            } catch {
+                self.loadError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Ascends one level, parking the cursor on whatever was just left. At an archive's root
+    /// that means stepping out of the archive and onto the archive file itself.
     func goUp() {
-        guard let up = DirectoryLister.parent(of: directory) else { return }
-        enter(up, selecting: directory.lastPathComponent, recordHistory: true)
+        guard let up = location.parent else { return }
+        go(to: up, selecting: location.nameWithinParent, recordHistory: true)
     }
 
     func move(_ move: CursorMove) {
@@ -292,18 +365,21 @@ final class PanelViewModel: Identifiable {
     /// switches away, and before the session is written out.
     func captureActiveTab() {
         guard tabs.indices.contains(activeTabIndex) else {
-            tabs = [PanelTab(url: directory, sort: sort, cursorName: cursorEntry?.name)]
+            tabs = [PanelTab(location: location, sort: sort, cursorName: cursorEntry?.name)]
             activeTabIndex = 0
             return
         }
-        tabs[activeTabIndex].path = directory.path
+        tabs[activeTabIndex].setLocation(location)
         tabs[activeTabIndex].sort = sort
         tabs[activeTabIndex].cursorName = cursorEntry?.name
     }
 
     func openTab(at url: URL? = nil, activate: Bool = true) {
         captureActiveTab()
-        let tab = PanelTab(url: url ?? directory, sort: sort)
+        let tab = PanelTab(
+            location: url.map { PanelLocation.directory($0.standardizedFileURL) } ?? location,
+            sort: sort
+        )
         tabs.insert(tab, at: activeTabIndex + 1)
         if activate {
             activeTabIndex += 1
@@ -340,14 +416,14 @@ final class PanelViewModel: Identifiable {
     /// history: switching tabs is not navigation within a tab.
     private func show(_ tab: PanelTab) {
         sort = tab.sort
-        enter(tab.url.standardizedFileURL, selecting: tab.cursorName, recordHistory: false)
+        go(to: tab.location, selecting: tab.cursorName, recordHistory: false)
     }
 
     /// Restores a saved pane, falling back to the current directory if nothing usable is left.
     func restore(tabs saved: [PanelTab], activeIndex: Int) {
         let usable = saved.filter { FileManager.default.fileExists(atPath: $0.path) }
         guard !usable.isEmpty else {
-            tabs = [PanelTab(url: directory, sort: sort)]
+            tabs = [PanelTab(location: location, sort: sort)]
             activeTabIndex = 0
             return
         }
@@ -372,6 +448,7 @@ final class PanelViewModel: Identifiable {
         guard entries.indices.contains(index) else { return nil }
         let entry = entries[index]
         guard !entry.isParent else { return nil }
+        guard !entry.isArchiveMember else { return Self.readOnlyArchiveMessage }
 
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != entry.name else { return nil }
@@ -456,16 +533,22 @@ final class PanelViewModel: Identifiable {
     }
 
     private func load(_ cursorTarget: CursorTarget) {
-        let target = directory
+        let target = location
         let includeHidden = showHidden
 
         loadTask?.cancel()
         isLoading = true
         loadTask = Task { [weak self] in
-            let outcome = await Self.read(target, includeHidden: includeHidden)
+            let outcome: ListingOutcome
+            switch target {
+            case .directory(let url):
+                outcome = await Self.read(url, includeHidden: includeHidden)
+            case .archive(let archive, let path):
+                outcome = await Self.readArchive(archive, path: path)
+            }
             guard let self, !Task.isCancelled else { return }
             // A newer navigation may have landed while this listing was in flight.
-            guard self.directory.path == target.path else { return }
+            guard self.location.isSamePlace(as: target) else { return }
             self.apply(outcome, cursorTarget)
         }
     }
@@ -479,15 +562,40 @@ final class PanelViewModel: Identifiable {
         }
     }
 
+    /// Lists one level inside an archive. Sizes come straight from the archive's own table of
+    /// contents, including recursive totals for directories, so nothing has to be measured.
+    private static func readArchive(_ archive: URL, path: String) async -> ListingOutcome {
+        do {
+            let index = try await ArchiveStore.shared.index(for: archive)
+            let rows = index.children(of: path).map { member in
+                FileEntry(
+                    member: member,
+                    in: archive,
+                    directorySize: member.isDirectory ? index.size(ofDirectory: member.path) : 0
+                )
+            }
+            return .listed(rows)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
     private func apply(_ outcome: ListingOutcome, _ target: CursorTarget) {
         isLoading = false
-        freeSpace = (try? directory.resourceValues(forKeys: [.volumeAvailableCapacityKey]))
+        freeSpace = (try? location.containingDirectory
+            .resourceValues(forKeys: [.volumeAvailableCapacityKey]))
             .flatMap(\.volumeAvailableCapacity).map(Int64.init)
         switch outcome {
         case .listed(let children):
             var rows = sort.sorted(children, directorySizes: sizer.sizes)
-            if let up = DirectoryLister.parent(of: directory) {
-                rows.insert(.parent(up), at: 0)
+            switch location {
+            case .directory:
+                if let up = DirectoryLister.parent(of: directory) {
+                    rows.insert(.parent(up), at: 0)
+                }
+            case .archive(let archive, let path):
+                // Always present inside an archive: at its root the row is the way back out.
+                rows.insert(.archiveParent(archive: archive, path: path), at: 0)
             }
             allEntries = rows
             loadError = nil

@@ -31,6 +31,9 @@ enum Formatters {
     static func sizeColumn(for entry: FileEntry, directorySize: Int64?, measuring: Bool) -> String {
         if entry.isParent { return "<UP>" }
         guard entry.isDirectory else { return size(entry.size) }
+        // A directory inside an archive already carries its recursive total: the archive's table
+        // of contents lists every member's size, so there is nothing left to measure.
+        if entry.isArchiveMember { return size(entry.size) }
         if let directorySize { return size(directorySize) }
         return measuring ? "…" : "<DIR>"
     }

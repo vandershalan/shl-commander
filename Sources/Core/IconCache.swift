@@ -26,6 +26,11 @@ final class IconCache {
 
     private static func key(for entry: FileEntry) -> String {
         if entry.isParent { return "\u{1}parent" }
+        // An archive member's URL is synthetic, so it can only ever be keyed by kind.
+        if entry.isArchiveMember {
+            if entry.isDirectory { return "\u{1}dir" }
+            return entry.ext.isEmpty ? "\u{1}file" : "ext:" + entry.ext
+        }
         // Bundles are visually unique; everything else collapses to its kind.
         if entry.isPackage { return "\u{1}pkg:" + entry.url.path }
         if entry.isDirectory { return "\u{1}dir" }
@@ -38,6 +43,14 @@ final class IconCache {
         // intrinsic height wins against a 16pt height constraint. The `..` name and the
         // `<UP>` size column already identify the row.
         if entry.isParent { return NSWorkspace.shared.icon(for: .folder) }
+        // An archive member has no file on disk to ask about, so its icon comes from the name.
+        if entry.isArchiveMember {
+            guard !entry.isDirectory else { return NSWorkspace.shared.icon(for: .folder) }
+            if !entry.ext.isEmpty, let type = UTType(filenameExtension: entry.ext) {
+                return NSWorkspace.shared.icon(for: type)
+            }
+            return NSWorkspace.shared.icon(for: .data)
+        }
         // Covers packages too — they are directories with their own artwork.
         if entry.isDirectory { return NSWorkspace.shared.icon(forFile: entry.url.path) }
         if !entry.ext.isEmpty, let type = UTType(filenameExtension: entry.ext) {

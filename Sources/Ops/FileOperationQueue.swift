@@ -98,6 +98,136 @@ final class FileOperationQueue {
         }
     }
 
+    // MARK: - Extraction from an archive
+
+    /// Pulls members out of an archive into a real directory.
+    ///
+    /// Two-phase: bsdtar extracts into a staging directory created *inside* the destination, and
+    /// each item is then moved into place through the same conflict resolution as a copy. Staging
+    /// inside the destination keeps that final move a same-volume rename, which is instant;
+    /// staging in the system temp directory would risk a second full copy across volumes.
+    func startExtraction(
+        from archive: URL,
+        members: [FileEntry],
+        to destination: URL,
+        prompt: any ConflictPrompting
+    ) {
+        guard task == nil, !members.isEmpty else { return }
+
+        failures = []
+        progress = Progress(
+            title: "Extracting",
+            bytesTotal: members.reduce(0) { $0 + $1.size },
+            itemsTotal: members.count,
+            isScanning: false
+        )
+
+        let counter = ByteCounter()
+        startTicker(counter)
+        task = Task.detached(priority: .userInitiated) { [weak self] in
+            await self?.extract(
+                from: archive,
+                members: members.map(\.archive?.member).compactMap { $0 },
+                sizes: members.map(\.size),
+                to: destination,
+                prompt: prompt,
+                counter: counter
+            )
+            await self?.finish()
+        }
+    }
+
+    private nonisolated func extract(
+        from archive: URL,
+        members: [String],
+        sizes: [Int64],
+        to destination: URL,
+        prompt: any ConflictPrompting,
+        counter: ByteCounter
+    ) async {
+        let fileManager = FileManager.default
+        let staging = destination.appendingPathComponent(
+            ".shl-extract-\(UUID().uuidString)", isDirectory: true)
+        // Removed whatever happens, so a cancelled or failed extraction leaves nothing behind.
+        defer { try? fileManager.removeItem(at: staging) }
+
+        do {
+            try ArchiveReader.extract(
+                members: members,
+                from: archive,
+                to: staging,
+                isCancelled: { Task.isCancelled }
+            )
+        } catch {
+            await record(OperationFailure(url: archive, message: error.localizedDescription))
+            return
+        }
+
+        let exists: (URL) -> Bool = { fileManager.fileExists(atPath: $0.path) }
+        let modified: (URL) -> Date? = {
+            try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        }
+        var standingResolution: ConflictResolution?
+
+        for (index, member) in members.enumerated() {
+            if Task.isCancelled { break }
+            let name = ArchiveIndex.normalise(member)
+            await setCurrent(item: name, itemsDone: index)
+
+            let source = staging.appendingPathComponent(name)
+            // Only the top level of each selected member moves; a selected folder arrives whole.
+            let target = destination.appendingPathComponent(name)
+            guard exists(source) else {
+                await record(
+                    OperationFailure(url: source, message: "Not found in the archive."))
+                continue
+            }
+
+            var resolution = ConflictResolution.rename
+            if exists(target) {
+                if let standingResolution {
+                    resolution = standingResolution
+                } else {
+                    guard
+                        let decision = await prompt.resolveConflict(
+                            kind: .copy, source: source, destination: target)
+                    else { break }
+                    if decision.applyToAll { standingResolution = decision.resolution }
+                    resolution = decision.resolution
+                }
+            }
+
+            let plan = ConflictResolver.plan(
+                source: source, destination: target, resolution: resolution,
+                exists: exists, modified: modified
+            )
+
+            do {
+                switch plan {
+                case .skip:
+                    break
+                case .overwrite(let url):
+                    try fileManager.removeItem(at: url)
+                    try moveIntoPlace(from: source, to: url)
+                case .write(let url):
+                    try moveIntoPlace(from: source, to: url)
+                }
+            } catch {
+                await record(OperationFailure(url: target, message: error.localizedDescription))
+            }
+            counter.add(sizes.indices.contains(index) ? sizes[index] : 0)
+        }
+
+        await setCurrent(item: "", itemsDone: members.count)
+    }
+
+    /// Creates any missing parent directories, then renames the staged item into place.
+    private nonisolated func moveIntoPlace(from source: URL, to target: URL) throws {
+        try FileManager.default.createDirectory(
+            at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.moveItem(at: source, to: target)
+    }
+
     // MARK: - Delete
 
     func startDeletion(of urls: [URL], toTrash: Bool) {

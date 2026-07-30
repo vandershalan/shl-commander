@@ -75,11 +75,19 @@ struct PanelView: View {
     private var pathBar: some View {
         HStack(spacing: 6) {
             volumePicker
-            Text(panel.directory.path)
+            if panel.isInsideArchive {
+                // Marks the pane as looking inside a file rather than at a folder, and says
+                // plainly that nothing here can be written to.
+                Image(systemName: "doc.zipper")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .help("Inside an archive — read-only")
+            }
+            Text(panel.displayPath)
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.head)
-                .help(panel.directory.path)
+                .help(panel.displayPath)
             Spacer(minLength: 0)
             if panel.isLoading {
                 ProgressView().controlSize(.small)

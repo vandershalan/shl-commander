@@ -80,7 +80,7 @@ final class FSEventsWatcher {
     private static let latency: CFTimeInterval = 0.2
 
     init?(watching directory: URL, onChange: @escaping @MainActor () -> Void) {
-        let watchedPath = Self.canonicalPath(directory)
+        let watchedPath = directory.canonicalPath
         target = EventTarget(watchedPath: watchedPath, onChange: onChange)
 
         var context = FSEventStreamContext(
@@ -136,20 +136,6 @@ final class FSEventsWatcher {
             self.stream = nil
             target.invalidate()
             return nil
-        }
-    }
-
-    /// Resolves through `realpath(3)` rather than `resolvingSymlinksInPath()`.
-    ///
-    /// Foundation's version deliberately *strips* a leading `/private` instead of resolving
-    /// `/var` to `/private/var`, so a path under the temporary directory stayed spelled
-    /// `/var/folders/…` while FSEvents reported `/private/var/folders/…`. Every event was then
-    /// filtered out as belonging to some other directory.
-    private static func canonicalPath(_ url: URL) -> String {
-        url.withUnsafeFileSystemRepresentation { pointer -> String in
-            guard let pointer, let resolved = realpath(pointer, nil) else { return url.path }
-            defer { free(resolved) }
-            return String(cString: resolved)
         }
     }
 

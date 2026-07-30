@@ -106,7 +106,11 @@ final class AppState {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.saveSession() }
+            MainActor.assumeIsolated {
+                self?.saveSession()
+                // Copies pulled out of archives for previewing are disposable by design.
+                ArchiveStore.removeScratch()
+            }
         }
 
         if settings.restoreSession, let session = SessionStore.load() {

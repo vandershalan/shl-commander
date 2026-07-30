@@ -19,7 +19,12 @@ struct CommandDispatcher {
             quickLook(panel)
         case .viewInternal:
             guard let entry = panel.actionTargets.first, !entry.isDirectory else { break }
-            InternalViewer.show(entry.url)
+            Task {
+                guard let urls = await materialise([entry], reportingTo: panel),
+                    let url = urls.first
+                else { return }
+                InternalViewer.show(url)
+            }
         case .editFile:
             edit(panel)
 
@@ -35,6 +40,10 @@ struct CommandDispatcher {
         case .duplicate:
             duplicate(on: panel)
         case .renameInPlace:
+            guard !panel.isInsideArchive else {
+                refuseArchiveWrite()
+                break
+            }
             panel.requestRename()
         case .moveToTrash:
             delete(on: panel, toTrash: true)
@@ -113,6 +122,11 @@ struct CommandDispatcher {
 
         // Favourites
         case .addFavorite:
+            // A favourite is a real folder; bookmarking a spot inside an archive would point at
+            // something that stops existing the moment the archive is rebuilt.
+            // A favourite is a real folder. Inside an archive that is the folder holding it —
+            // bookmarking a spot inside would point at something that stops existing the moment
+            // the archive is rebuilt.
             addFavorite(panel.directory)
         case .showFavorites:
             showFavoritesMenu()
@@ -166,6 +180,17 @@ struct CommandDispatcher {
         let targets = panel.actionTargets
         guard !targets.isEmpty, !state.operations.isRunning else { return }
 
+        // Copying out of an archive is extraction; moving out of one would mean deleting from
+        // it, which is not supported.
+        if let archive = panel.location.archiveURL {
+            guard kind == .copy else {
+                refuseArchiveWrite()
+                return
+            }
+            extract(targets, from: archive, on: panel)
+            return
+        }
+
         let summary = targets.count == 1
             ? "\u{22}\(targets[0].name)\u{22}"
             : "\(targets.count) items"
@@ -216,11 +241,47 @@ struct CommandDispatcher {
         }
     }
 
+    /// Asks where to extract, then pulls the selection out of the archive.
+    private func extract(_ targets: [FileEntry], from archive: URL, on panel: PanelViewModel) {
+        let summary = targets.count == 1
+            ? "\u{22}\(targets[0].name)\u{22}"
+            : "\(targets.count) items"
+        guard
+            let typed = OperationPrompts.askForName(
+                title: "Extract \(summary) to:",
+                message: "The folder is created if it does not exist.",
+                initial: state.inactivePanel.directory.path,
+                buttonTitle: "Extract"
+            ),
+            let destination = resolveDestination(typed)
+        else { return }
+
+        state.operations.startExtraction(
+            from: archive,
+            members: targets.filter(\.isArchiveMember),
+            to: destination,
+            prompt: OperationPrompts()
+        )
+    }
+
+    private func refuseArchiveWrite() {
+        OperationPrompts.report([
+            OperationFailure(
+                url: state.activePanel.location.archiveURL ?? state.activePanel.directory,
+                message: PanelViewModel.readOnlyArchiveMessage
+            )
+        ])
+    }
+
     /// Copies into the current directory, where every name collides by definition — so it
     /// resolves to "keep both" without asking.
     private func duplicate(on panel: PanelViewModel) {
         let targets = panel.actionTargets
         guard !targets.isEmpty, !state.operations.isRunning else { return }
+        guard !panel.isInsideArchive else {
+            refuseArchiveWrite()
+            return
+        }
 
         state.operations.start(
             FileOperationRequest(
@@ -236,6 +297,10 @@ struct CommandDispatcher {
     private func delete(on panel: PanelViewModel, toTrash: Bool) {
         let targets = panel.actionTargets
         guard !targets.isEmpty, !state.operations.isRunning else { return }
+        guard !panel.isInsideArchive else {
+            refuseArchiveWrite()
+            return
+        }
         // Both kinds confirm, listing what is about to go: a mistaken Trash move is
         // recoverable, but only once you work out what disappeared.
         guard OperationPrompts.confirmDelete(targets, toTrash: toTrash) else { return }
@@ -244,6 +309,10 @@ struct CommandDispatcher {
     }
 
     private func createItem(on panel: PanelViewModel, directory: Bool) {
+        guard !panel.isInsideArchive else {
+            refuseArchiveWrite()
+            return
+        }
         guard
             let name = OperationPrompts.askForName(
                 title: directory ? "New folder name:" : "New file name:"
@@ -288,25 +357,71 @@ struct CommandDispatcher {
         guard !targets.isEmpty else { return }
         let cursorURL = panel.cursorEntry?.url
         let start = targets.firstIndex { $0.url == cursorURL } ?? 0
-        guard QuickLookController.shared.prepare(targets.map(\.url), startingAt: start) else {
-            return
+
+        Task { [weak panel] in
+            // Quick Look needs real files, so members are pulled out to scratch copies first.
+            guard let urls = await materialise(targets, reportingTo: panel) else { return }
+            guard QuickLookController.shared.prepare(urls, startingAt: start) else { return }
+            QuickLookController.shared.toggle()
         }
-        QuickLookController.shared.toggle()
+    }
+
+    /// Resolves entries to files on disk, extracting any that live inside an archive.
+    ///
+    /// Returns nil when something could not be extracted, having already reported it — the
+    /// caller should do nothing rather than act on a partial set.
+    private func materialise(
+        _ entries: [FileEntry],
+        reportingTo panel: PanelViewModel?
+    ) async -> [URL]? {
+        var urls: [URL] = []
+        for entry in entries {
+            guard let origin = entry.archive else {
+                urls.append(entry.url)
+                continue
+            }
+            do {
+                urls.append(
+                    try await ArchiveStore.shared.materialise(
+                        member: origin.member, from: origin.archive))
+            } catch {
+                OperationPrompts.report([
+                    OperationFailure(url: entry.url, message: error.localizedDescription)
+                ])
+                return nil
+            }
+        }
+        return urls
     }
 
     /// Opens in the configured editor, or in whatever the system would use otherwise.
+    ///
+    /// A member of an archive opens as an extracted copy, so edits to it are not written back.
     private func edit(_ panel: PanelViewModel) {
         guard let entry = panel.actionTargets.first, !entry.isDirectory else { return }
+        guard entry.archive == nil else {
+            Task {
+                guard let urls = await materialise([entry], reportingTo: panel),
+                    let url = urls.first
+                else { return }
+                openInEditor(url)
+            }
+            return
+        }
+        openInEditor(entry.url)
+    }
+
+    private func openInEditor(_ url: URL) {
         let identifier = AppSettings.shared.editorBundleIdentifier
         guard
             !identifier.isEmpty,
             let application = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier)
         else {
-            NSWorkspace.shared.open(entry.url)
+            NSWorkspace.shared.open(url)
             return
         }
         NSWorkspace.shared.open(
-            [entry.url],
+            [url],
             withApplicationAt: application,
             configuration: NSWorkspace.OpenConfiguration()
         )
@@ -393,6 +508,11 @@ struct CommandDispatcher {
     }
 
     private func revealInFinder(_ panel: PanelViewModel) {
+        // A member has no file of its own to select, so the archive is what gets revealed.
+        if let archive = panel.location.archiveURL {
+            NSWorkspace.shared.activateFileViewerSelecting([archive])
+            return
+        }
         let targets = panel.actionTargets.map(\.url)
         if targets.isEmpty {
             NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: panel.directory.path)
