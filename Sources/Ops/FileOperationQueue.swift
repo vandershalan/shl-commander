@@ -117,7 +117,9 @@ final class FileOperationQueue {
         failures = []
         progress = Progress(
             title: "Extracting",
-            bytesTotal: members.reduce(0) { $0 + $1.size },
+            // Clamped: a compressed stream does not always record its payload size, and a
+            // negative total would invert the bar.
+            bytesTotal: members.reduce(0) { $0 + max(0, $1.size) },
             itemsTotal: members.count,
             isScanning: false
         )
@@ -215,7 +217,7 @@ final class FileOperationQueue {
             } catch {
                 await record(OperationFailure(url: target, message: error.localizedDescription))
             }
-            counter.add(sizes.indices.contains(index) ? sizes[index] : 0)
+            counter.add(sizes.indices.contains(index) ? max(0, sizes[index]) : 0)
         }
 
         await setCurrent(item: "", itemsDone: members.count)

@@ -61,6 +61,10 @@ struct FileEntry: Identifiable, Hashable, Sendable {
         self.archive = archive
     }
 
+    /// Size of something whose container does not record it. Rendered as a dash rather than as
+    /// a misleading "0 bytes".
+    static let unknownSize: Int64 = -1
+
     var id: URL { url }
 
     /// True when this entry is inside an archive, so it cannot be written to or stat'd.

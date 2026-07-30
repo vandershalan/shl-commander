@@ -162,10 +162,20 @@ a message rather than half-done, and edits to an opened member are not written b
 files out, change them, and repack.
 
 Recognised: `zip` (including `jar`, `war`, `ipa`, `cbz`), `tar`, `tar.gz`/`tgz`,
-`tar.bz2`/`tbz`, `tar.xz`/`txz`, `tar.zst`, `7z`, `rar`/`cbr`, `cpio`, `iso`. A bare `.gz` or
-`.xz` is not included: it is a single compressed stream, not a container, so there is nothing to
-navigate. Reading is done by `/usr/bin/tar`, which on macOS is bsdtar over libarchive — no
-third-party archive library is vendored.
+`tar.bz2`/`tbz`, `tar.xz`/`txz`, `tar.zst`, `7z`, `rar`/`cbr`, `cpio`, `iso`, and the single
+compressed streams `gz`, `bz2`, `xz`, `zst`, `Z`. A stream holds exactly one payload, so it opens
+as a one-row listing you can preview and copy out decompressed.
+
+The format is decided by the file's **content**, not its name, so an archive whose extension is
+wrong still opens — a gzipped CSV handed out as `.zip` is a real and common case. When the two
+disagree the archive marker in the path bar says so. The name is still what decides whether a row
+offers `Return`, because sniffing every row of a large directory would mean opening every file
+in it.
+
+Reading is done by `/usr/bin/tar`, which on macOS is bsdtar over libarchive, and by `gzip` and
+`bzip2` for streams — no third-party archive library is vendored. `xz` and `zstd` streams need
+those tools installed (Homebrew); the app says which one is missing rather than failing
+obscurely.
 
 ### Rebinding
 

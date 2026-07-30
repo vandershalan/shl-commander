@@ -10,6 +10,7 @@ enum ArchiveReader {
     enum Failure: Error, LocalizedError {
         case unsupported(String)
         case toolFailed(status: Int32, message: String)
+        case missingTool(String)
         case cancelled
 
         var errorDescription: String? {
@@ -18,6 +19,8 @@ enum ArchiveReader {
                 return "\u{22}\(name)\u{22} is not an archive this app can open."
             case .toolFailed(_, let message):
                 return message.isEmpty ? "The archive could not be read." : message
+            case .missingTool(let name):
+                return "\(name) is needed to open this file and is not installed."
             case .cancelled:
                 return "Cancelled"
             }
@@ -28,10 +31,17 @@ enum ArchiveReader {
 
     // MARK: - Listing
 
-    /// Lists an archive. Runs `tar` once and parses its long listing.
+    /// Lists an archive.
+    ///
+    /// The format comes from the file's content, so an archive whose name is wrong still opens.
+    /// A single compressed stream has no table of contents to read, so its one payload is
+    /// described directly.
     static func index(of archive: URL) throws -> ArchiveIndex {
-        guard let format = ArchiveFormat.detect(url: archive) else {
+        guard let format = ArchiveProbe.format(of: archive) else {
             throw Failure.unsupported(archive.lastPathComponent)
+        }
+        if format.isSingleStream {
+            return singleStreamIndex(of: archive, format: format)
         }
 
         let output = try run(["-tvf", archive.path])
@@ -140,6 +150,132 @@ enum ArchiveReader {
         return calendar.date(from: components) ?? .distantPast
     }
 
+    // MARK: - Single compressed streams
+
+    /// Describes the one payload inside a compressed stream.
+    static func singleStreamIndex(of archive: URL, format: ArchiveFormat) -> ArchiveIndex {
+        let values = try? archive.resourceValues(
+            forKeys: [.contentModificationDateKey, .fileSizeKey])
+        let member = ArchiveMember(
+            path: payloadName(for: archive, format: format),
+            isDirectory: false,
+            isSymlink: false,
+            size: uncompressedSize(of: archive, format: format),
+            modified: values?.contentModificationDate ?? .distantPast
+        )
+        return ArchiveIndex(archive: archive, format: format, members: [member])
+    }
+
+    /// Names the payload by removing the compression suffix.
+    ///
+    /// When the name carries no such suffix — which is exactly the case for a stream misnamed
+    /// `.zip` — the misleading extension is dropped instead, since it describes a format the file
+    /// is not in.
+    static func payloadName(for archive: URL, format: ArchiveFormat) -> String {
+        let name = archive.lastPathComponent
+        if let suffix = format.streamSuffix, name.lowercased().hasSuffix(suffix.lowercased()) {
+            return String(name.dropLast(suffix.count))
+        }
+        let stem = (name as NSString).deletingPathExtension
+        return stem.isEmpty ? name : stem
+    }
+
+    /// Uncompressed size where the container records it cheaply, and -1 where it does not.
+    ///
+    /// gzip stores it in the last four bytes of the file, so it costs one seek. The value is
+    /// modulo 2^32, so a payload over 4 GB reads low — which is why it is taken as a hint rather
+    /// than promised as exact. bzip2, xz and the rest keep no such field, and decompressing the
+    /// whole file just to count bytes is not worth it for a listing.
+    static func uncompressedSize(of archive: URL, format: ArchiveFormat) -> Int64 {
+        guard format == .gzipStream else { return FileEntry.unknownSize }
+        guard let handle = try? FileHandle(forReadingFrom: archive) else {
+            return FileEntry.unknownSize
+        }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd(), size >= 4 else { return FileEntry.unknownSize }
+        try? handle.seek(toOffset: size - 4)
+        guard let footer = try? handle.read(upToCount: 4), footer.count == 4 else {
+            return FileEntry.unknownSize
+        }
+        let bytes = Array(footer)
+        let value =
+            UInt32(bytes[0]) | UInt32(bytes[1]) << 8 | UInt32(bytes[2]) << 16
+            | UInt32(bytes[3]) << 24
+        return Int64(value)
+    }
+
+    /// Decompressors for the single-stream formats, first match on disk wins.
+    ///
+    /// gzip and bzip2 ship with macOS. xz and zstd do not, so a file in one of those formats
+    /// reports what is missing rather than failing obscurely.
+    private static func decompressor(for format: ArchiveFormat) throws -> (URL, [String]) {
+        let candidates: (names: [String], flags: [String])
+        switch format {
+        case .gzipStream: candidates = (["/usr/bin/gzip"], ["-dc"])
+        case .bzip2Stream: candidates = (["/usr/bin/bzip2"], ["-dc"])
+        case .compressStream: candidates = (["/usr/bin/uncompress", "/usr/bin/gzip"], ["-dc"])
+        case .xzStream:
+            candidates = (["/usr/bin/xz", "/opt/homebrew/bin/xz", "/usr/local/bin/xz"], ["-dc"])
+        case .zstdStream:
+            candidates = (
+                ["/usr/bin/zstd", "/opt/homebrew/bin/zstd", "/usr/local/bin/zstd"], ["-dc"]
+            )
+        default:
+            throw Failure.unsupported(format.rawValue)
+        }
+
+        guard let tool = candidates.names.first(where: { FileManager.default.isExecutableFile(atPath: $0) })
+        else {
+            throw Failure.missingTool((candidates.names[0] as NSString).lastPathComponent)
+        }
+        return (URL(fileURLWithPath: tool), candidates.flags)
+    }
+
+    /// Decompresses the stream into `directory`, under the payload's name.
+    static func extractStream(
+        from archive: URL,
+        format: ArchiveFormat,
+        to directory: URL,
+        isCancelled: () -> Bool = { false }
+    ) throws {
+        if isCancelled() { throw Failure.cancelled }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let destination = directory.appendingPathComponent(
+            payloadName(for: archive, format: format))
+        let (tool, flags) = try decompressor(for: format)
+
+        FileManager.default.createFile(atPath: destination.path, contents: nil)
+        guard let output = try? FileHandle(forWritingTo: destination) else {
+            throw Failure.toolFailed(status: -1, message: "Could not write the decompressed file.")
+        }
+        defer { try? output.close() }
+
+        let errors = Pipe()
+        let process = Process()
+        process.executableURL = tool
+        process.arguments = flags + [archive.path]
+        process.standardOutput = output
+        process.standardError = errors
+
+        var succeeded = false
+        // A half-written file looks like a finished one, so it goes if this fails.
+        defer { if !succeeded { try? FileManager.default.removeItem(at: destination) } }
+
+        try process.run()
+        let errorData = errors.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            throw Failure.toolFailed(
+                status: process.terminationStatus,
+                message: String(data: errorData, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            )
+        }
+        succeeded = true
+    }
+
     // MARK: - Extraction
 
     /// Extracts the named members into `directory`, keeping their paths inside the archive.
@@ -153,8 +289,14 @@ enum ArchiveReader {
         isCancelled: () -> Bool = { false }
     ) throws {
         guard !members.isEmpty else { return }
-        guard ArchiveFormat.detect(url: archive) != nil else {
+        guard let format = ArchiveProbe.format(of: archive) else {
             throw Failure.unsupported(archive.lastPathComponent)
+        }
+        // A single stream has one payload; there is nothing to select within it.
+        if format.isSingleStream {
+            try extractStream(
+                from: archive, format: format, to: directory, isCancelled: isCancelled)
+            return
         }
         let safe = members.filter { !ArchiveIndex.isUnsafe($0) }
         guard !safe.isEmpty else { return }

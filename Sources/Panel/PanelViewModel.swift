@@ -47,6 +47,11 @@ final class PanelViewModel: Identifiable {
     /// Free space on the volume the panel is on, refreshed with each listing.
     private(set) var freeSpace: Int64?
 
+    /// What the open archive turned out to be, and whether its name said otherwise. Shown as the
+    /// tooltip on the archive marker, because a file whose name lies is worth saying out loud —
+    /// it explains why a `.zip` holds a single row.
+    private(set) var archiveNote: String?
+
     /// Marked rows, held by URL so they survive a reload of the same directory.
     private(set) var marks: Set<URL> = []
 
@@ -116,6 +121,10 @@ final class PanelViewModel: Identifiable {
 
     private var cursorStorage: Int = 0
     private var loadTask: Task<Void, Never>?
+    /// Work that happens before a location changes: checking an archive can be read, or pulling
+    /// a member out so something can open it. Tracked so `settle()` still means "finished
+    /// reacting" now that opening is no longer immediate.
+    private var openTask: Task<Void, Never>?
 
     private static let historyLimit = 100
     private var backStack: [PanelLocation] = []
@@ -209,6 +218,31 @@ final class PanelViewModel: Identifiable {
         navigate(to: volume ?? URL(fileURLWithPath: "/"))
     }
 
+    /// Reported when an archive cannot be opened, so the failure is not left to a footer line
+    /// that is easy to miss.
+    var onOpenFailure: ((URL, String) -> Void)?
+
+    /// Opens an archive only if it can actually be read.
+    ///
+    /// The listing is fetched before the pane moves. Navigating first and failing afterwards
+    /// left the pane apparently inside a file, showing nothing but the way back out, which reads
+    /// as an empty archive rather than an unreadable one.
+    func openArchive(_ archive: URL) {
+        openTask?.cancel()
+        openTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await ArchiveStore.shared.index(for: archive)
+                guard !Task.isCancelled else { return }
+                self.enterArchive(archive)
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.onOpenFailure?(archive, error.localizedDescription)
+            }
+            self.openTask = nil
+        }
+    }
+
     /// Opens an archive and shows its root, as though it were a folder.
     ///
     /// The archive's URL is canonicalised on the way in, so the same file reached by different
@@ -300,7 +334,7 @@ final class PanelViewModel: Identifiable {
         if entry.isDirectory {
             navigate(to: entry.url)
         } else if entry.isBrowsableArchive {
-            enterArchive(entry.url)
+            openArchive(entry.url)
         } else {
             NSWorkspace.shared.open(entry.url)
         }
@@ -317,15 +351,17 @@ final class PanelViewModel: Identifiable {
             return
         }
 
-        Task { [weak self] in
+        openTask?.cancel()
+        openTask = Task { [weak self] in
             guard let self else { return }
+            defer { self.openTask = nil }
             do {
                 let extracted = try await ArchiveStore.shared.materialise(
                     member: origin.member, from: origin.archive)
                 // A nested archive opens as an archive rather than being handed to the system,
                 // so browsing keeps working all the way down.
                 if entry.isBrowsableArchive {
-                    self.enterArchive(extracted)
+                    self.openArchive(extracted)
                 } else {
                     NSWorkspace.shared.open(extracted)
                 }
@@ -526,10 +562,18 @@ final class PanelViewModel: Identifiable {
 
     // MARK: - Loading
 
-    /// Awaits the in-flight listing. Exists so tests can act on a settled panel instead of
-    /// polling; the app itself never needs to block on a load.
+    /// Awaits whatever the panel is currently doing. Exists so tests can act on a settled panel
+    /// instead of polling; the app itself never needs to block.
+    ///
+    /// Both an open and a listing have to be awaited, and in that order: opening an archive
+    /// checks it can be read *before* moving, and only then schedules the listing. Bounded, so a
+    /// panel that somehow keeps rescheduling cannot hang a test forever.
     func settle() async {
-        await loadTask?.value
+        for _ in 0..<10 {
+            await openTask?.value
+            await loadTask?.value
+            if openTask == nil, loadTask == nil { return }
+        }
     }
 
     private func load(_ cursorTarget: CursorTarget) {
@@ -550,6 +594,7 @@ final class PanelViewModel: Identifiable {
             // A newer navigation may have landed while this listing was in flight.
             guard self.location.isSamePlace(as: target) else { return }
             self.apply(outcome, cursorTarget)
+            self.loadTask = nil
         }
     }
 
@@ -567,6 +612,9 @@ final class PanelViewModel: Identifiable {
     private static func readArchive(_ archive: URL, path: String) async -> ListingOutcome {
         do {
             let index = try await ArchiveStore.shared.index(for: archive)
+            await MainActor.run {
+                ArchiveNote.latest = ArchiveNote.describe(index: index, archive: archive)
+            }
             let rows = index.children(of: path).map { member in
                 FileEntry(
                     member: member,
@@ -587,6 +635,7 @@ final class PanelViewModel: Identifiable {
             .flatMap(\.volumeAvailableCapacity).map(Int64.init)
         switch outcome {
         case .listed(let children):
+            archiveNote = location.isInsideArchive ? ArchiveNote.latest : nil
             var rows = sort.sorted(children, directorySizes: sizer.sizes)
             switch location {
             case .directory:

@@ -78,14 +78,24 @@ struct ArchiveFormatTests {
         #expect(ArchiveFormat.detect(name: "a.tar.xz") == .tarXZ)
     }
 
-    @Test("a single compressed stream is not an archive")
-    func singleStreamsExcluded() {
-        // There is nothing to navigate inside these.
-        #expect(ArchiveFormat.detect(name: "a.gz") == nil)
-        #expect(ArchiveFormat.detect(name: "a.bz2") == nil)
-        #expect(ArchiveFormat.detect(name: "a.xz") == nil)
+    @Test("single compressed streams open, holding one payload each")
+    func singleStreams() {
+        // These were excluded at first on the grounds that there is nothing to navigate. That
+        // was the wrong call: a stream holds exactly one payload, and showing it as a single row
+        // means it can be previewed and copied out decompressed.
+        #expect(ArchiveFormat.detect(name: "a.gz") == .gzipStream)
+        #expect(ArchiveFormat.detect(name: "a.bz2") == .bzip2Stream)
+        #expect(ArchiveFormat.detect(name: "a.xz") == .xzStream)
+        #expect(ArchiveFormat.detect(name: "a.zst") == .zstdStream)
+        #expect(ArchiveFormat.detect(name: "a.gz")?.isSingleStream == true)
+        #expect(ArchiveFormat.detect(name: "a.zip")?.isSingleStream == false)
+    }
+
+    @Test("names that are not archives at all stay unrecognised")
+    func notArchives() {
         #expect(ArchiveFormat.detect(name: "notes.txt") == nil)
         #expect(ArchiveFormat.detect(name: "zip") == nil, "an extensionless name is not a zip")
+        #expect(ArchiveFormat.detect(name: "image.png") == nil)
     }
 }
 

@@ -30,6 +30,8 @@ enum Formatters {
     /// measured, and `…` while it is being measured.
     static func sizeColumn(for entry: FileEntry, directorySize: Int64?, measuring: Bool) -> String {
         if entry.isParent { return "<UP>" }
+        // A compressed stream does not always record how big its payload is.
+        if entry.size == FileEntry.unknownSize { return "—" }
         guard entry.isDirectory else { return size(entry.size) }
         // A directory inside an archive already carries its recursive total: the archive's table
         // of contents lists every member's size, so there is nothing left to measure.

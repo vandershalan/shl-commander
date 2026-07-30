@@ -88,6 +88,11 @@ final class AppState {
 
     /// Loads both panes for the first time and wires operation follow-up.
     func start() {
+        for panel in [left, right] {
+            panel.onOpenFailure = { archive, message in
+                OperationPrompts.report([OperationFailure(url: archive, message: message)])
+            }
+        }
         // Until step 5 adds FSEvents, an operation's result only shows after an explicit
         // reload of both panes — the source pane lost items, the destination gained them.
         operations.onCompletion = { [weak self] in

@@ -81,7 +81,7 @@ struct PanelView: View {
                 Image(systemName: "doc.zipper")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .help("Inside an archive — read-only")
+                    .help(panel.archiveNote ?? "Inside an archive — read-only")
             }
             Text(panel.displayPath)
                 .font(.system(size: 12, weight: .medium))
