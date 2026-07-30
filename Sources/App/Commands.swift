@@ -26,6 +26,9 @@ struct MainCommands: Commands {
         CommandMenu(Command.Section.view.title) { items(in: .view) }
         CommandMenu(Command.Section.panes.title) { items(in: .panes) }
         CommandMenu(Command.Section.favorites.title) { items(in: .favorites) }
+        // Replaces SwiftUI's stock "shl-commander Help", which points at a help book that
+        // does not exist. The shortcut list is what help means here.
+        CommandGroup(replacing: .help) { items(in: .help) }
     }
 
     @ViewBuilder

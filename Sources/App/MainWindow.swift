@@ -21,11 +21,7 @@ struct MainWindow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            FavoritesBarView(
-                store: state.favorites,
-                onOpen: { CommandDispatcher(state: state).open($0) },
-                onAddCurrent: { CommandDispatcher(state: state).perform(.addFavorite) }
-            )
+            topBar
             Divider()
             panes
             if let progress = state.operations.progress {
@@ -35,6 +31,49 @@ struct MainWindow: View {
         }
         .frame(minWidth: 2 * minimumPaneWidth + dividerWidth, minHeight: 400)
         .task { state.start() }
+    }
+
+    /// Favourites plus the buttons that do not belong to any one pane.
+    private var topBar: some View {
+        let dispatcher = CommandDispatcher(state: state)
+        // Both panes share the setting, so either one answers for it.
+        let showingHidden = state.activePanel.showHidden
+
+        return HStack(spacing: 8) {
+            FavoritesBarView(
+                store: state.favorites,
+                onOpen: { dispatcher.open($0) },
+                onAddCurrent: { dispatcher.perform(.addFavorite) }
+            )
+
+            Divider().frame(height: 14)
+
+            Button {
+                dispatcher.perform(.toggleHidden)
+            } label: {
+                Image(systemName: showingHidden ? "eye" : "eye.slash")
+                    // Tinted when on, so the state reads at a glance rather than only from
+                    // which of two similar glyphs is showing.
+                    .foregroundStyle(showingHidden ? Color.accentColor : Color.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(
+                showingHidden
+                    ? "Hide hidden files (\u{2318}\u{21E7}.)"
+                    : "Show hidden files (\u{2318}\u{21E7}.)"
+            )
+
+            Button {
+                dispatcher.perform(.showShortcuts)
+            } label: {
+                Image(systemName: "keyboard")
+            }
+            .buttonStyle(.borderless)
+            .help("Keyboard shortcuts (\u{2318}/)")
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 26)
+        .background(.bar)
     }
 
     private var panes: some View {

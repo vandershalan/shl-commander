@@ -59,6 +59,28 @@ struct KeyChordTests {
         #expect(KeyChord(0, [.capsLock]) == KeyChord(0, []))
     }
 
+    @Test("punctuation keys are drawn as the character, not as their keymap name")
+    func punctuationDisplayNames() throws {
+        // Named in a keymap file but labelled with the glyph, or the shortcut list would read
+        // "⌘Slash" and "⇧⌘Period".
+        let expected: [(String, String)] = [
+            ("cmd+slash", "⌘/"),
+            ("cmd+shift+period", "⇧⌘."),
+            ("cmd+leftbracket", "⌘["),
+            ("cmd+rightbracket", "⌘]"),
+            ("ctrl+backslash", "⌃\\"),
+            ("cmd+comma", "⌘,"),
+            ("cmd+minus", "⌘-"),
+            ("cmd+equal", "⌘="),
+        ]
+        for (chord, label) in expected {
+            #expect(
+                try #require(KeyChord(parsing: chord)).displayName == label,
+                Comment(rawValue: chord)
+            )
+        }
+    }
+
     @Test("display names read like macOS menu shortcuts")
     func displayNames() throws {
         #expect(try #require(KeyChord(parsing: "cmd+k")).displayName == "⌘K")

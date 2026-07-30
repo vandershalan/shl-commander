@@ -10,6 +10,10 @@ struct CommandDispatcher {
         let panel = state.activePanel
 
         switch command {
+        // Help
+        case .showShortcuts:
+            ShortcutsWindow.show(keymap: state.keymap)
+
         // Viewing
         case .quickLook:
             quickLook(panel)

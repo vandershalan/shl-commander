@@ -117,7 +117,15 @@ extension KeyChord {
         return result + Self.symbol(for: keyCode)
     }
 
+    /// Punctuation is named in a keymap file (`period`, `leftbracket`) but has to be *drawn* as
+    /// the character itself: "⌘Slash" and "⇧⌘Period" are not how a Mac labels ⌘/ and ⇧⌘.
+    private static let punctuationSymbols: [UInt16: String] = [
+        24: "=", 27: "-", 30: "]", 33: "[", 39: "'", 41: ";", 42: "\\", 43: ",", 44: "/",
+        47: ".", 50: "`",
+    ]
+
     private static func symbol(for keyCode: UInt16) -> String {
+        if let punctuation = punctuationSymbols[keyCode] { return punctuation }
         switch keyCode {
         case 36: return "↩"
         case 48: return "⇥"

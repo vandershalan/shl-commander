@@ -3,6 +3,9 @@ import UniformTypeIdentifiers
 
 /// Favourite folders across the top of the window. Clicking one sends the active pane there;
 /// the first nine also answer to ⌘1–⌘9.
+///
+/// Draws no background or fixed height of its own: `MainWindow` owns the bar it sits in, so
+/// the buttons beside it share the same strip.
 struct FavoritesBarView: View {
     let store: FavoritesStore
     /// Where a click should navigate to.
@@ -29,9 +32,6 @@ struct FavoritesBarView: View {
             .buttonStyle(.borderless)
             .help("Add the active folder to favourites (⌘⇧D)")
         }
-        .padding(.horizontal, 8)
-        .frame(height: 26)
-        .background(.bar)
     }
 
     private func chip(_ favorite: Favorite, number: Int) -> some View {

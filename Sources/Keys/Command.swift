@@ -5,6 +5,9 @@ import Foundation
 ///
 /// Commands are added in the step that implements them; a name here always does something.
 enum Command: String, CaseIterable, Codable, Sendable {
+    // Help
+    case showShortcuts
+
     // Viewing
     case quickLook
     case viewInternal
@@ -81,6 +84,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
     /// Menu title. Also what the README's shortcut table prints.
     var title: String {
         switch self {
+        case .showShortcuts: return "Keyboard Shortcuts…"
         case .quickLook: return "Quick Look"
         case .viewInternal: return "View as Text"
         case .editFile: return "Edit"
@@ -150,6 +154,8 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .addFavorite, .showFavorites, .favorite1, .favorite2, .favorite3, .favorite4,
             .favorite5, .favorite6, .favorite7, .favorite8, .favorite9:
             return .favorites
+        case .showShortcuts:
+            return .help
         case .quickLook, .viewInternal, .editFile,
             .newFolder, .newFile, .copyToOtherPane, .moveToOtherPane, .duplicate,
             .renameInPlace, .moveToTrash, .deletePermanently, .openInTerminal, .revealInFinder,
@@ -177,6 +183,9 @@ enum Command: String, CaseIterable, Codable, Sendable {
 
     enum Section: String, CaseIterable, Sendable {
         case file, mark, go, view, panes, favorites
+        /// Rides the standard Help menu rather than getting a menu of its own, which would
+        /// leave two menus called Help in the bar.
+        case help
 
         var title: String {
             switch self {
@@ -186,6 +195,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
             case .view: return "View"
             case .panes: return "Panes"
             case .favorites: return "Favourites"
+            case .help: return "Help"
             }
         }
     }

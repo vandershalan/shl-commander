@@ -24,6 +24,8 @@ cursor that never wanders, marks kept separate from the cursor, and a command fo
   keeping the cursor and the marks.
 - **Session restore**: tabs, paths, sort, and focus come back on relaunch.
 - Quick Look (`F3`), an internal text/hex viewer, Open in Terminal, Reveal in Finder.
+- **A searchable shortcut list** (`F1` or `⌘/`), built from the live keymap, so it cannot fall
+  out of step with what the keys actually do.
 
 ## Requirements
 
@@ -82,6 +84,7 @@ setting. Holding `fn` works too.
 
 | Command | Total Commander | macOS |
 | --- | --- | --- |
+| Keyboard shortcuts | `F1` | `⌘/` |
 | Quick Look | `F3` | `⌘Y` |
 | View as text / hex | `⌥F3` | `⌘⇧Y` |
 | Edit | `F4` | `⌘E` |
@@ -118,7 +121,9 @@ setting. Holding `fn` works too.
 | Copy path | `⌃⇧Return` | `⌘⌥C` |
 | Clear filter | `Esc` | |
 
-Sorting is also available by clicking a column header.
+The bar along the top of the window carries the favourites, a button that shows or hides
+hidden files, and a button that opens the shortcut list. Sorting is also available by clicking
+a column header.
 
 Typing any printable character starts a quick filter, shown in a bar at the foot of the pane
 with a live match count. `Backspace` edits that filter for as long as the bar is showing —

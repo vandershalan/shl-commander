@@ -56,6 +56,7 @@ extension Keymap {
     /// F1, F2, etc. keys as standard function keys" is on, so without them a stock Mac
     /// could not drive the app at all.
     static let defaults = Keymap([
+        .showShortcuts: [chord("f1"), chord("cmd+slash")],
         .quickLook: [chord("f3"), chord("cmd+y")],
         .viewInternal: [chord("opt+f3"), chord("cmd+shift+y")],
         .editFile: [chord("f4"), chord("cmd+e")],
