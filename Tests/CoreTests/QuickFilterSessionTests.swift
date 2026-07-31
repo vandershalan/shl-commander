@@ -225,22 +225,35 @@ struct DeleteSummaryTests {
         #expect(summary.detail.contains("3 KB") || summary.detail.contains("3,000"))
     }
 
-    @Test("every name is listed, with folders marked")
-    func listsNames() {
+    @Test("full paths are listed, with folders marked by a trailing slash")
+    func listsFullPaths() {
+        // Names alone do not answer "which file"; the dialog is wide enough for the whole path.
         let summary = OperationPrompts.deleteSummary(
             [entry("keep.txt", size: 1), entry("stuff", directory: true)], toTrash: true)
-        #expect(summary.detail.contains("keep.txt"))
-        #expect(summary.detail.contains("stuff/"))
+
+        #expect(summary.paths == ["/tmp/keep.txt", "/tmp/stuff/"])
+        // The prose stays prose: counts and consequence, no file list.
+        #expect(summary.detail.contains("keep.txt") == false)
     }
 
-    @Test("a long list is capped so the dialog cannot outgrow the screen")
-    func capsLongLists() {
+    @Test("every item is listed, however many there are")
+    func listsEverything() {
+        // The list scrolls rather than the dialog growing, so nothing is truncated: an
+        // "and 28 more" tail would hide exactly the items worth checking.
         let many = (1...40).map { entry("file-\($0).txt", size: 10) }
         let summary = OperationPrompts.deleteSummary(many, toTrash: true)
 
-        #expect(summary.detail.contains("file-1.txt"))
-        #expect(summary.detail.contains("and 28 more"))
-        #expect(summary.detail.contains("file-40.txt") == false)
+        #expect(summary.paths.count == 40)
+        #expect(summary.paths.first == "/tmp/file-1.txt")
+        #expect(summary.paths.last == "/tmp/file-40.txt")
+        #expect(summary.detail.contains("more") == false)
+    }
+
+    @Test("the dialog is built wide enough for a path to be readable")
+    func dialogIsWide() {
+        // NSAlert sizes itself around its accessory view; the stock width fits about a folder
+        // name, which is useless for confirming which file is about to go.
+        #expect(OperationPrompts.dialogWidth >= 600)
     }
 
     @Test("a permanent delete needs typing for folders or for more than ten items")

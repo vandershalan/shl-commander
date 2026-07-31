@@ -4,6 +4,16 @@ import AppKit
 /// testable without a UI.
 @MainActor
 struct OperationPrompts: ConflictPrompting {
+    /// Width every operation dialog is built to.
+    ///
+    /// `NSAlert` sizes itself around its accessory view, so this is what makes these dialogs wide
+    /// enough to read a full path in. The default width fits roughly a folder name and nothing
+    /// more, which is useless for confirming *which* file is about to be overwritten or deleted.
+    static let dialogWidth: CGFloat = 620
+
+    /// Tallest a path list grows before it scrolls instead.
+    private static let listMaxHeight: CGFloat = 220
+
     func resolveConflict(
         kind: FileOperationKind,
         source: URL,
@@ -17,11 +27,20 @@ struct OperationPrompts: ConflictPrompting {
             Destination: \(Self.describe(destination))
             """
 
-        let applyToAll = NSButton(checkboxWithTitle: "Apply to all remaining", target: nil, action: nil)
+        let applyToAll = NSButton(
+            checkboxWithTitle: "Apply to all remaining", target: nil, action: nil)
         // Turns Overwrite into overwrite-if-newer, so all four resolutions are reachable
         // without a fifth button crowding the dialog.
-        let onlyIfNewer = NSButton(checkboxWithTitle: "Only if the source is newer", target: nil, action: nil)
-        alert.accessoryView = Self.stack([applyToAll, onlyIfNewer])
+        let onlyIfNewer = NSButton(
+            checkboxWithTitle: "Only if the source is newer", target: nil, action: nil)
+
+        // Both full paths, because "already exists" is only answerable if you can see exactly
+        // which two files are meant.
+        alert.accessoryView = Self.verticalStack([
+            Self.pathList(["From:  \(source.path)", "To:    \(destination.path)"]),
+            applyToAll,
+            onlyIfNewer,
+        ])
 
         alert.addButton(withTitle: ConflictResolution.rename.buttonTitle)  // safest first
         alert.addButton(withTitle: ConflictResolution.overwrite.buttonTitle)
@@ -62,16 +81,22 @@ struct OperationPrompts: ConflictPrompting {
         alert.messageText = summary.headline
         alert.informativeText = summary.detail
 
+        // Every path, on a list that scrolls rather than a dialog that grows.
+        var accessories: [NSView] = [pathList(summary.paths)]
+
         var field: NSTextField?
         if needsTyping {
+            let label = NSTextField(labelWithString: "Type \u{201C}delete\u{201D} to confirm:")
             let input = NSTextField(string: "")
             input.placeholderString = "delete"
-            input.frame = NSRect(x: 0, y: 0, width: 240, height: 24)
-            let label = NSTextField(labelWithString: "Type \u{201C}delete\u{201D} to confirm:")
-            alert.accessoryView = stack([label, input])
-            alert.window.initialFirstResponder = input
+            input.frame = NSRect(x: 0, y: 0, width: 200, height: 24)
+            accessories.append(label)
+            accessories.append(input)
             field = input
         }
+
+        alert.accessoryView = verticalStack(accessories)
+        if let field { alert.window.initialFirstResponder = field }
 
         alert.addButton(withTitle: toTrash ? "Move to Trash" : "Delete")
         alert.addButton(withTitle: "Cancel")
@@ -84,11 +109,14 @@ struct OperationPrompts: ConflictPrompting {
         return field.stringValue.trimmingCharacters(in: .whitespaces).lowercased() == "delete"
     }
 
-    /// The two strings a delete confirmation shows. Built separately from the dialog so the
-    /// wording and the counts can be tested without putting a window on screen.
+    /// What a delete confirmation shows. Built separately from the dialog so the wording, the
+    /// counts and the paths can be tested without putting a window on screen.
     struct DeleteSummary: Equatable, Sendable {
         let headline: String
+        /// Counts, total size and the consequence — prose, not data.
         let detail: String
+        /// Full path of every item, in display order. Not truncated: the dialog scrolls.
+        let paths: [String]
     }
 
     /// Typing is demanded for a permanent delete of a folder or of a large batch — the cases
@@ -98,7 +126,6 @@ struct OperationPrompts: ConflictPrompting {
         return targets.count > 10 || targets.contains(where: \.isDirectory)
     }
 
-    /// Long lists are capped so the dialog cannot grow past the screen.
     static func deleteSummary(_ targets: [FileEntry], toTrash: Bool) -> DeleteSummary {
         let folders = targets.count(where: \.isDirectory)
         let files = targets.count - folders
@@ -109,43 +136,34 @@ struct OperationPrompts: ConflictPrompting {
             ? "\u{22}\(targets.first?.name ?? "")\u{22}"
             : "\(targets.count) items"
 
-        var lines: [String] = []
-
         var counts: [String] = []
         if files > 0 { counts.append("\(files) file\(files == 1 ? "" : "s")") }
         if folders > 0 { counts.append("\(folders) folder\(folders == 1 ? "" : "s")") }
 
         // Only files have a size to hand. Measuring a folder's contents means walking it,
         // which is far too slow to do while the user waits on a dialog.
-        let bytes = targets.filter { !$0.isDirectory }.reduce(Int64(0)) { $0 + $1.size }
+        let bytes = targets.filter { !$0.isDirectory }.reduce(Int64(0)) { $0 + max(0, $1.size) }
         var totals = counts.joined(separator: ", ")
         if bytes > 0 { totals += " · \(Formatters.size(bytes))" }
         if folders > 0 { totals += " (folder contents included)" }
-        lines.append(totals)
 
-        let shown = 12
-        lines.append("")
-        for target in targets.prefix(shown) {
-            lines.append(target.isDirectory ? "\(target.name)/" : target.name)
-        }
-        if targets.count > shown {
-            lines.append("… and \(targets.count - shown) more")
-        }
-
-        lines.append("")
-        lines.append(
+        let consequence =
             toTrash
-                ? "Items can be put back from the Trash."
-                : "This cannot be undone. The Trash is not involved."
-        )
+            ? "Items can be put back from the Trash."
+            : "This cannot be undone. The Trash is not involved."
 
         return DeleteSummary(
             headline: "\(verb) \(what)\(suffix)",
-            detail: lines.joined(separator: "\n")
+            detail: totals + "\n\n" + consequence,
+            // A trailing slash marks a folder, whose contents go with it.
+            paths: targets.map { $0.isDirectory ? "\($0.url.path)/" : $0.url.path }
         )
     }
 
-    /// Used for New Folder, New File, and Rename.
+    /// Used for New Folder, New File, Rename, and for the destination of a copy, move or extract.
+    ///
+    /// The field is the full dialog width because it is usually prefilled with a path, and a path
+    /// you cannot read is a path you cannot check before pressing Return.
     static func askForName(
         title: String,
         message: String? = nil,
@@ -157,7 +175,8 @@ struct OperationPrompts: ConflictPrompting {
         if let message { alert.informativeText = message }
 
         let field = NSTextField(string: initial)
-        field.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
+        field.frame = NSRect(x: 0, y: 0, width: dialogWidth, height: 24)
+        field.lineBreakMode = .byTruncatingHead
         alert.accessoryView = field
         alert.window.initialFirstResponder = field
         alert.addButton(withTitle: buttonTitle)
@@ -175,10 +194,11 @@ struct OperationPrompts: ConflictPrompting {
         alert.messageText = failures.count == 1
             ? "1 item could not be completed"
             : "\(failures.count) items could not be completed"
-        alert.informativeText = failures.prefix(10)
-            .map { "\($0.url.lastPathComponent): \($0.message)" }
-            .joined(separator: "\n")
-            + (failures.count > 10 ? "\n… and \(failures.count - 10) more" : "")
+        // Full paths, and every failure rather than the first ten: knowing which item failed is
+        // the whole point of the dialog.
+        alert.accessoryView = verticalStack([
+            pathList(failures.map { "\($0.url.path)\n    \($0.message)" })
+        ])
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }
@@ -193,15 +213,59 @@ struct OperationPrompts: ConflictPrompting {
         return "\(Formatters.size(Int64(values.fileSize ?? 0))), modified \(date)"
     }
 
-    private static func stack(_ views: [NSView]) -> NSView {
+    /// A read-only, selectable list of paths that scrolls when it runs out of room.
+    ///
+    /// Long paths wrap rather than scrolling sideways, so all of a path is on screen at once —
+    /// across two lines if need be, which beats having to drag a scroller to read the end of it.
+    /// Selectable so a path can be copied out of the dialog.
+    private static func pathList(_ lines: [String]) -> NSView {
+        let text = NSTextView()
+        text.string = lines.joined(separator: "\n")
+        text.isEditable = false
+        text.isSelectable = true
+        text.drawsBackground = false
+        text.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        text.textContainerInset = NSSize(width: 4, height: 4)
+        text.isVerticallyResizable = true
+        text.isHorizontallyResizable = false
+        text.textContainer?.widthTracksTextView = true
+
+        // Two visual lines allowed per entry, since a long path wraps.
+        let estimated = CGFloat(lines.count) * 2 * 14 + 12
+        let scroll = NSScrollView(
+            frame: NSRect(
+                x: 0, y: 0,
+                width: dialogWidth,
+                height: min(listMaxHeight, max(34, estimated))
+            )
+        )
+        scroll.documentView = text
+        scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = false
+        scroll.autohidesScrollers = true
+        scroll.borderType = .bezelBorder
+        return scroll
+    }
+
+    /// Stacks accessory views at the dialog's width, sizing itself to their heights.
+    ///
+    /// Framed rather than auto-laid-out: `NSAlert` measures an accessory view by its frame, so a
+    /// view that only knows its size through constraints comes out flat.
+    private static func verticalStack(_ views: [NSView], spacing: CGFloat = 8) -> NSView {
+        // `sizeToFit` lives on NSControl, not NSView, and only the controls here need it: a
+        // checkbox or label built from a convenience initialiser starts out with a zero frame.
+        for case let control as NSControl in views where control.frame.height == 0 {
+            control.sizeToFit()
+        }
         let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 6
-        stack.frame = NSRect(
-            x: 0, y: 0, width: 280,
-            height: CGFloat(views.count) * 24 + CGFloat(max(0, views.count - 1)) * 6
-        )
+        stack.spacing = spacing
+
+        let height =
+            views.reduce(0) { $0 + max($1.frame.height, 18) }
+            + CGFloat(max(0, views.count - 1)) * spacing
+        stack.frame = NSRect(x: 0, y: 0, width: dialogWidth, height: height)
         return stack
     }
 }
