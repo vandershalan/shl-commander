@@ -68,10 +68,37 @@ users' home directories behind TCC, so grant access once:
 
 Everything outside those protected paths works without the grant.
 
-> An ad-hoc signature (`--sign -`) changes on every rebuild, and TCC keys the grant to the
-> signature. If the app stops reading `~/Documents` after a rebuild, remove and re-add it in
-> Full Disk Access — or point daily use at the stable `/Applications` copy that `make release`
-> installs.
+Granting Full Disk Access once is what stops the per-folder prompts entirely. Without it macOS
+asks the first time the app touches each protected folder.
+
+### Why permissions used to be asked for again and again
+
+macOS keys a privacy grant to the app's *designated requirement*. Signed ad-hoc (`--sign -`),
+that requirement is a `cdhash` — a hash of the binary itself:
+
+```
+designated => cdhash H"fa2d2ccd…"
+```
+
+Every rebuild produces a different hash, so macOS sees a different app and every permission has
+to be granted again. `make release` therefore signs with a real identity when the keychain has
+one, which makes the requirement stable:
+
+```
+designated => identifier "com.szalankiewicz.shl-commander" and anchor apple generic
+              and certificate leaf[subject.CN] = "Apple Development: …"
+```
+
+That survives rebuilds, so a grant given once keeps working. `make identity` reports which
+identity will be used and what it means; `make release` prints the requirement it ended up with.
+
+Any code-signing certificate works — an Apple Development one if you have it, otherwise a
+self-signed one made in **Keychain Access → Certificate Assistant → Create a Certificate**, kind
+*Code Signing*. With no certificate at all the build falls back to ad-hoc and says so.
+
+> Changing the signing identity changes the app's identity once, so macOS asks once more after
+> the switch. That answer then sticks. The Debug build from `make run` is still ad-hoc and still
+> prompts; daily use is meant to be the `/Applications` copy.
 
 ### 2. Function keys
 

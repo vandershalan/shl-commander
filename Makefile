@@ -10,7 +10,16 @@ RESULTS := $(DERIVED)/TestResults.xcresult
 XCB := xcodebuild -quiet -project $(PROJECT) -scheme $(SCHEME) -configuration $(CONFIG) \
        -destination '$(DEST)' -derivedDataPath $(DERIVED)
 
-.PHONY: gen build test run clean release icon
+# macOS keys a privacy (TCC) grant to the app's "designated requirement". Signed ad-hoc, that
+# requirement is a cdhash — a hash of the binary — so every rebuild looks like a different app
+# and every folder permission has to be granted again. Signed with a real identity it becomes
+# identifier + certificate, which survives rebuilds and keeps the grant.
+#
+# The first identity the keychain offers is used; override with `make release SIGN_IDENTITY=...`.
+SIGN_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null \
+                   | sed -n 's/.*"\(.*\)".*/\1/p' | head -1)
+
+.PHONY: gen build test run clean release icon identity
 
 gen:
 	xcodegen generate
@@ -36,19 +45,44 @@ run: build
 clean:
 	rm -rf $(DERIVED) $(PROJECT)
 
-# Ad-hoc signing and the hardened runtime are mutually exclusive, so --options runtime is
-# deliberately absent; Xcode disables it for ad-hoc builds anyway.
+# Reports which identity will be used, and what that means for privacy prompts.
+identity:
+	@if [ -n '$(SIGN_IDENTITY)' ]; then \
+	  echo "Signing identity: $(SIGN_IDENTITY)"; \
+	  echo "Privacy grants will survive rebuilds."; \
+	else \
+	  echo "Signing identity: none found — falling back to ad-hoc."; \
+	  echo "Privacy grants will be lost on every rebuild."; \
+	  echo "Create one in Keychain Access: Certificate Assistant > Create a Certificate,"; \
+	  echo "type 'Code Signing', self-signed. Any name will do."; \
+	fi
+	@security find-identity -v -p codesigning 2>/dev/null | head -5
+
+# --options runtime is deliberately absent: the hardened runtime buys nothing here and cannot
+# be combined with ad-hoc signing, which is the fallback path.
 release:
 	$(MAKE) CONFIG=Release build
 	rm -rf /Applications/shl-commander.app
 	cp -R build/Build/Products/Release/shl-commander.app /Applications/
-	codesign --force --deep --sign - \
-	  --entitlements Resources/ShlCommander.entitlements \
-	  /Applications/shl-commander.app
+	@if [ -n '$(SIGN_IDENTITY)' ] && codesign --force --deep \
+	     --sign '$(SIGN_IDENTITY)' \
+	     --entitlements Resources/ShlCommander.entitlements \
+	     /Applications/shl-commander.app 2>/dev/null; then \
+	  echo "Signed as: $(SIGN_IDENTITY)"; \
+	else \
+	  echo "Signing ad-hoc (no usable identity: an expired certificate signs nothing)."; \
+	  echo "Privacy permissions will need granting again after each rebuild — see 'make identity'."; \
+	  codesign --force --deep --sign - \
+	    --entitlements Resources/ShlCommander.entitlements \
+	    /Applications/shl-commander.app; \
+	fi
 	@codesign --verify --deep --strict /Applications/shl-commander.app && echo "signature OK"
 	@echo ""
 	@echo "Installed to /Applications/shl-commander.app"
-	@echo "Grant Full Disk Access to this copy: System Settings > Privacy & Security."
+	@codesign -d -r- /Applications/shl-commander.app 2>&1 | sed -n 's/^# designated => /Identity: /p'
+	@codesign -d -r- /Applications/shl-commander.app 2>&1 | grep -q 'cdhash' \
+	  && echo "This identity is tied to this exact build, so privacy grants will not persist." \
+	  || echo "This identity is stable, so privacy grants persist across rebuilds."
 
 # Redraws Resources/AppIcon.icns. Only needed when the artwork changes.
 icon:
