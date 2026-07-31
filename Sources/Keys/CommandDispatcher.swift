@@ -194,24 +194,32 @@ struct CommandDispatcher {
         let summary = targets.count == 1
             ? "\u{22}\(targets[0].name)\u{22}"
             : "\(targets.count) items"
-        guard
-            let typed = OperationPrompts.askForName(
-                title: "\(kind.title) \(summary) to:",
-                message: "The folder is created if it does not exist.",
-                initial: state.inactivePanel.directory.path,
-                buttonTitle: kind.title
-            )
-        else { return }
+        let bytes = targets.reduce(Int64(0)) { $0 + max(0, $1.size) }
 
-        guard let destination = resolveDestination(typed) else { return }
-        state.operations.start(
-            FileOperationRequest(
-                kind: kind,
-                sources: targets.map(\.url),
-                destinationDirectory: destination
-            ),
-            prompt: OperationPrompts()
-        )
+        Task { [state] in
+            guard
+                let typed = await state.operationSheet.confirm(
+                    OperationSheetModel.Confirmation(
+                        title: "\(kind.title) \(summary)",
+                        detail: bytes > 0 ? Formatters.size(bytes) : "",
+                        paths: targets.map(\.url.path),
+                        confirmTitle: kind.title,
+                        destination: state.inactivePanel.directory.path
+                    )
+                ),
+                let destination = resolveDestination(typed)
+            else { return }
+
+            state.operationSheet.showRunning()
+            state.operations.start(
+                FileOperationRequest(
+                    kind: kind,
+                    sources: targets.map(\.url),
+                    destinationDirectory: destination
+                ),
+                prompt: SheetConflictPrompt(model: state.operationSheet)
+            )
+        }
     }
 
     /// Turns typed text into a usable destination directory, creating it when needed.
@@ -222,9 +230,7 @@ struct CommandDispatcher {
 
         if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) {
             guard isDirectory.boolValue else {
-                OperationPrompts.report([
-                    OperationFailure(url: url, message: "Not a folder.")
-                ])
+                report([OperationFailure(url: url, message: "Not a folder.")])
                 return nil
             }
             return url
@@ -234,9 +240,7 @@ struct CommandDispatcher {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             return url
         } catch {
-            OperationPrompts.report([
-                OperationFailure(url: url, message: error.localizedDescription)
-            ])
+            report([OperationFailure(url: url, message: error.localizedDescription)])
             return nil
         }
     }
@@ -246,26 +250,41 @@ struct CommandDispatcher {
         let summary = targets.count == 1
             ? "\u{22}\(targets[0].name)\u{22}"
             : "\(targets.count) items"
-        guard
-            let typed = OperationPrompts.askForName(
-                title: "Extract \(summary) to:",
-                message: "The folder is created if it does not exist.",
-                initial: state.inactivePanel.directory.path,
-                buttonTitle: "Extract"
-            ),
-            let destination = resolveDestination(typed)
-        else { return }
 
-        state.operations.startExtraction(
-            from: archive,
-            members: targets.filter(\.isArchiveMember),
-            to: destination,
-            prompt: OperationPrompts()
-        )
+        Task { [state] in
+            guard
+                let typed = await state.operationSheet.confirm(
+                    OperationSheetModel.Confirmation(
+                        title: "Extract \(summary)",
+                        detail: "From \(archive.lastPathComponent)",
+                        paths: targets.map(\.url.path),
+                        confirmTitle: "Extract",
+                        destination: state.inactivePanel.directory.path
+                    )
+                ),
+                let destination = resolveDestination(typed)
+            else { return }
+
+            state.operationSheet.showRunning()
+            state.operations.startExtraction(
+                from: archive,
+                members: targets.filter(\.isArchiveMember),
+                to: destination,
+                prompt: SheetConflictPrompt(model: state.operationSheet)
+            )
+        }
+    }
+
+    /// Errors go to the sheet so they land centred on the window; an alert is the fallback for
+    /// when the sheet is busy holding a running operation.
+    private func report(_ failures: [OperationFailure]) {
+        if !state.operationSheet.showFailures(failures) {
+            OperationPrompts.report(failures)
+        }
     }
 
     private func refuseArchiveWrite() {
-        OperationPrompts.report([
+        report([
             OperationFailure(
                 url: state.activePanel.location.archiveURL ?? state.activePanel.directory,
                 message: PanelViewModel.readOnlyArchiveMessage
@@ -283,15 +302,31 @@ struct CommandDispatcher {
             return
         }
 
-        state.operations.start(
-            FileOperationRequest(
-                kind: .copy,
-                sources: targets.map(\.url),
-                destinationDirectory: panel.directory,
-                automaticResolution: .rename
-            ),
-            prompt: OperationPrompts()
-        )
+        Task { [state] in
+            guard
+                await state.operationSheet.confirm(
+                    OperationSheetModel.Confirmation(
+                        title: targets.count == 1
+                            ? "Duplicate \u{22}\(targets[0].name)\u{22}"
+                            : "Duplicate \(targets.count) items",
+                        detail: "Copies are added alongside the originals.",
+                        paths: targets.map(\.url.path),
+                        confirmTitle: "Duplicate"
+                    )
+                ) != nil
+            else { return }
+
+            state.operationSheet.showRunning()
+            state.operations.start(
+                FileOperationRequest(
+                    kind: .copy,
+                    sources: targets.map(\.url),
+                    destinationDirectory: panel.directory,
+                    automaticResolution: .rename
+                ),
+                prompt: SheetConflictPrompt(model: state.operationSheet)
+            )
+        }
     }
 
     private func delete(on panel: PanelViewModel, toTrash: Bool) {
@@ -303,9 +338,26 @@ struct CommandDispatcher {
         }
         // Both kinds confirm, listing what is about to go: a mistaken Trash move is
         // recoverable, but only once you work out what disappeared.
-        guard OperationPrompts.confirmDelete(targets, toTrash: toTrash) else { return }
+        let summary = OperationPrompts.deleteSummary(targets, toTrash: toTrash)
+        let needsTyping = OperationPrompts.deleteNeedsTypedConfirmation(targets, toTrash: toTrash)
 
-        state.operations.startDeletion(of: targets.map(\.url), toTrash: toTrash)
+        Task { [state] in
+            guard
+                await state.operationSheet.confirm(
+                    OperationSheetModel.Confirmation(
+                        title: summary.headline,
+                        detail: summary.detail,
+                        paths: summary.paths,
+                        confirmTitle: toTrash ? "Move to Trash" : "Delete",
+                        isDestructive: true,
+                        requiredWord: needsTyping ? "delete" : nil
+                    )
+                ) != nil
+            else { return }
+
+            state.operationSheet.showRunning()
+            state.operations.startDeletion(of: targets.map(\.url), toTrash: toTrash)
+        }
     }
 
     private func createItem(on panel: PanelViewModel, directory: Bool) {
@@ -313,38 +365,48 @@ struct CommandDispatcher {
             refuseArchiveWrite()
             return
         }
-        guard
-            let name = OperationPrompts.askForName(
-                title: directory ? "New folder name:" : "New file name:"
-            )
-        else { return }
-        // "/" is a path separator and ":" is one to the classic Finder APIs; neither can
-        // appear in a name.
-        guard !name.contains("/"), !name.contains(":") else {
-            OperationPrompts.report([
-                OperationFailure(
-                    url: panel.directory.appendingPathComponent(name),
-                    message: "A name cannot contain / or :"
-                )
-            ])
-            return
-        }
+        Task { [state] in
+            guard
+                let name = await state.operationSheet.confirm(
+                    OperationSheetModel.Confirmation(
+                        title: directory ? "New folder" : "New file",
+                        detail: "In \(panel.directory.path)",
+                        paths: [],
+                        confirmTitle: "Create",
+                        destination: "",
+                        fieldLabel: "Name"
+                    )
+                )?.trimmingCharacters(in: .whitespacesAndNewlines),
+                !name.isEmpty
+            else { return }
 
-        let url = panel.directory.appendingPathComponent(name)
-        do {
-            if directory {
-                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
-            } else {
-                guard !FileManager.default.fileExists(atPath: url.path) else {
-                    throw CocoaError(.fileWriteFileExists)
-                }
-                try Data().write(to: url, options: .withoutOverwriting)
+            // "/" is a path separator and ":" is one to the classic Finder APIs; neither can
+            // appear in a name.
+            guard !name.contains("/"), !name.contains(":") else {
+                report([
+                    OperationFailure(
+                        url: panel.directory.appendingPathComponent(name),
+                        message: "A name cannot contain / or :"
+                    )
+                ])
+                return
             }
-            panel.reload(selecting: name)
-        } catch {
-            OperationPrompts.report([
-                OperationFailure(url: url, message: error.localizedDescription)
-            ])
+
+            let url = panel.directory.appendingPathComponent(name)
+            do {
+                if directory {
+                    try FileManager.default.createDirectory(
+                        at: url, withIntermediateDirectories: false)
+                } else {
+                    guard !FileManager.default.fileExists(atPath: url.path) else {
+                        throw CocoaError(.fileWriteFileExists)
+                    }
+                    try Data().write(to: url, options: .withoutOverwriting)
+                }
+                panel.reload(selecting: name)
+            } catch {
+                report([OperationFailure(url: url, message: error.localizedDescription)])
+            }
         }
     }
 
@@ -439,7 +501,7 @@ struct CommandDispatcher {
 
     func open(_ favorite: Favorite) {
         guard favorite.exists else {
-            OperationPrompts.report([
+            report([
                 OperationFailure(url: favorite.url, message: "This folder no longer exists.")
             ])
             return
@@ -449,15 +511,22 @@ struct CommandDispatcher {
 
     private func addFavorite(_ url: URL) {
         let suggested = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
-        guard
-            let name = OperationPrompts.askForName(
-                title: "Add to favourites",
-                message: url.path,
-                initial: suggested,
-                buttonTitle: "Add"
-            )
-        else { return }
-        state.favorites.add(url, name: name)
+        Task { [state] in
+            guard
+                let name = await state.operationSheet.confirm(
+                    OperationSheetModel.Confirmation(
+                        title: "Add to favourites",
+                        detail: url.path,
+                        paths: [],
+                        confirmTitle: "Add",
+                        destination: suggested,
+                        fieldLabel: "Name"
+                    )
+                )?.trimmingCharacters(in: .whitespacesAndNewlines),
+                !name.isEmpty
+            else { return }
+            state.favorites.add(url, name: name)
+        }
     }
 
     /// Popped up from code because a SwiftUI Menu cannot be opened by a keyboard command.

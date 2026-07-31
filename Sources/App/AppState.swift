@@ -25,6 +25,9 @@ final class AppState {
     /// One operation at a time, shared by both panes.
     let operations = FileOperationQueue()
 
+    /// The sheet an operation lives in, from confirmation through progress to failures.
+    let operationSheet = OperationSheetModel()
+
     /// Shared so a mount or unmount updates both panes' volume pickers at once.
     let volumes = VolumeService()
 
@@ -89,8 +92,11 @@ final class AppState {
     /// Loads both panes for the first time and wires operation follow-up.
     func start() {
         for panel in [left, right] {
-            panel.onOpenFailure = { archive, message in
-                OperationPrompts.report([OperationFailure(url: archive, message: message)])
+            panel.onOpenFailure = { [weak self] archive, message in
+                let failure = OperationFailure(url: archive, message: message)
+                if self?.operationSheet.showFailures([failure]) != true {
+                    OperationPrompts.report([failure])
+                }
             }
         }
         // Until step 5 adds FSEvents, an operation's result only shows after an explicit
@@ -99,11 +105,9 @@ final class AppState {
             guard let self else { return }
             self.left.reload()
             self.right.reload()
-            let failures = self.operations.failures
-            if !failures.isEmpty {
-                OperationPrompts.report(failures)
-                self.operations.dismissFailures()
-            }
+            // Failures keep the sheet up so they are actually read; a clean run closes it.
+            self.operationSheet.finish(failures: self.operations.failures)
+            self.operations.dismissFailures()
         }
         // Written on quit rather than continuously; a crash costs at most the last session.
         NotificationCenter.default.addObserver(

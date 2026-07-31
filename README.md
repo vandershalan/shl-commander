@@ -165,9 +165,20 @@ The cursor holds its place across every operation. When the row it sits on disap
 takes the nearest surviving row *above* where it was, walking past a whole deleted block if
 need be.
 
-Deleting always asks first, listing what is about to go: how many files and folders, their
-total size, and the names themselves. Permanently deleting a folder, or more than ten items,
-additionally requires typing the word `delete`.
+### Operation windows
+
+Copying, moving, extracting, duplicating and deleting all run through one panel attached to the
+window and centred on it. It confirms first — listing full paths, and for a delete the counts and
+total size — then *stays up* and turns into the progress view for the same operation, so there is
+no moment where something is happening with nothing to look at.
+
+**Continue in Background** hides the panel and leaves the work running. The bar along the bottom
+of the window then carries the progress, marked with a clock and a **Show** button that brings the
+panel back. If a name collision comes up after backgrounding, the panel returns on its own —
+otherwise the operation would be waiting for an answer with nothing on screen to answer.
+
+Deleting always asks first. Permanently deleting a folder, or more than ten items, additionally
+requires typing the word `delete`.
 
 `Return` on a file opens it in whichever app the system would use; `F4` opens it in your
 editor, chosen in Settings.

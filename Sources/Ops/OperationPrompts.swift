@@ -1,9 +1,14 @@
 import AppKit
 
-/// The modal dialogs file operations need. Kept apart from the queue so the queue stays
-/// testable without a UI.
+/// Alert-based prompts, and the text the operation sheet displays.
+///
+/// Confirmation, progress and collision questions all live in `OperationSheetModel` now, because
+/// a sheet is attached to the window and stays up while the work runs. What remains here is the
+/// name prompt still used outside an operation, the error alert used as a fallback when the sheet
+/// is busy, and the summary builders — kept apart from any UI so their wording and counts stay
+/// testable.
 @MainActor
-struct OperationPrompts: ConflictPrompting {
+struct OperationPrompts {
     /// Width every operation dialog is built to.
     ///
     /// `NSAlert` sizes itself around its accessory view, so this is what makes these dialogs wide
@@ -13,101 +18,6 @@ struct OperationPrompts: ConflictPrompting {
 
     /// Tallest a path list grows before it scrolls instead.
     private static let listMaxHeight: CGFloat = 220
-
-    func resolveConflict(
-        kind: FileOperationKind,
-        source: URL,
-        destination: URL
-    ) async -> ConflictDecision? {
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = "\u{22}\(destination.lastPathComponent)\u{22} already exists"
-        alert.informativeText = """
-            Source:      \(Self.describe(source))
-            Destination: \(Self.describe(destination))
-            """
-
-        let applyToAll = NSButton(
-            checkboxWithTitle: "Apply to all remaining", target: nil, action: nil)
-        // Turns Overwrite into overwrite-if-newer, so all four resolutions are reachable
-        // without a fifth button crowding the dialog.
-        let onlyIfNewer = NSButton(
-            checkboxWithTitle: "Only if the source is newer", target: nil, action: nil)
-
-        // Both full paths, because "already exists" is only answerable if you can see exactly
-        // which two files are meant.
-        alert.accessoryView = Self.verticalStack([
-            Self.pathList(["From:  \(source.path)", "To:    \(destination.path)"]),
-            applyToAll,
-            onlyIfNewer,
-        ])
-
-        alert.addButton(withTitle: ConflictResolution.rename.buttonTitle)  // safest first
-        alert.addButton(withTitle: ConflictResolution.overwrite.buttonTitle)
-        alert.addButton(withTitle: ConflictResolution.skip.buttonTitle)
-        alert.addButton(withTitle: "Cancel")
-
-        let response = alert.runModal()
-        let isApplyToAll = applyToAll.state == .on
-
-        switch response {
-        case .alertFirstButtonReturn:
-            return ConflictDecision(resolution: .rename, applyToAll: isApplyToAll)
-        case .alertSecondButtonReturn:
-            return ConflictDecision(
-                resolution: onlyIfNewer.state == .on ? .overwriteIfNewer : .overwrite,
-                applyToAll: isApplyToAll
-            )
-        case .alertThirdButtonReturn:
-            return ConflictDecision(resolution: .skip, applyToAll: isApplyToAll)
-        default:
-            return nil  // abandons the operation
-        }
-    }
-
-    /// Confirms a delete, listing exactly what is about to go.
-    ///
-    /// Both kinds ask, because a mistaken Trash move still has to be hunted down and put back.
-    /// A permanent delete of a folder or of more than ten items additionally demands the word
-    /// "delete" be typed, since there is nothing to undo.
-    static func confirmDelete(_ targets: [FileEntry], toTrash: Bool) -> Bool {
-        guard !targets.isEmpty else { return false }
-
-        let summary = deleteSummary(targets, toTrash: toTrash)
-        let needsTyping = deleteNeedsTypedConfirmation(targets, toTrash: toTrash)
-
-        let alert = NSAlert()
-        alert.alertStyle = toTrash ? .warning : .critical
-        alert.messageText = summary.headline
-        alert.informativeText = summary.detail
-
-        // Every path, on a list that scrolls rather than a dialog that grows.
-        var accessories: [NSView] = [pathList(summary.paths)]
-
-        var field: NSTextField?
-        if needsTyping {
-            let label = NSTextField(labelWithString: "Type \u{201C}delete\u{201D} to confirm:")
-            let input = NSTextField(string: "")
-            input.placeholderString = "delete"
-            input.frame = NSRect(x: 0, y: 0, width: 200, height: 24)
-            accessories.append(label)
-            accessories.append(input)
-            field = input
-        }
-
-        alert.accessoryView = verticalStack(accessories)
-        if let field { alert.window.initialFirstResponder = field }
-
-        alert.addButton(withTitle: toTrash ? "Move to Trash" : "Delete")
-        alert.addButton(withTitle: "Cancel")
-        // Escape and ⌘. cancel, so a stray Return cannot confirm a destructive dialog by
-        // reflex alone.
-        alert.buttons[1].keyEquivalent = "\u{1b}"
-
-        guard alert.runModal() == .alertFirstButtonReturn else { return false }
-        guard let field else { return true }
-        return field.stringValue.trimmingCharacters(in: .whitespaces).lowercased() == "delete"
-    }
 
     /// What a delete confirmation shows. Built separately from the dialog so the wording, the
     /// counts and the paths can be tested without putting a window on screen.

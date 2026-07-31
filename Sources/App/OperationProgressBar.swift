@@ -3,12 +3,21 @@ import SwiftUI
 /// Bottom bar shown only while an operation is running.
 struct OperationProgressBar: View {
     let progress: FileOperationQueue.Progress
+    /// True once the operation was sent to the background, so the bar is the only sign of it.
+    let isBackgrounded: Bool
     let onCancel: () -> Void
+    let onReveal: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
+                    if isBackgrounded {
+                        // Says plainly that this is still going, unattended.
+                        Image(systemName: "clock.arrow.circlepath")
+                            .foregroundStyle(.secondary)
+                            .help("Running in the background")
+                    }
                     Text(progress.title).fontWeight(.medium)
                     Text(progress.currentItem)
                         .foregroundStyle(.secondary)
@@ -25,8 +34,11 @@ struct OperationProgressBar: View {
                     ProgressView(value: progress.fraction).progressViewStyle(.linear)
                 }
             }
+            if isBackgrounded {
+                Button("Show", action: onReveal)
+                    .help("Bring the operation window back")
+            }
             Button("Cancel", action: onCancel)
-                .keyboardShortcut(.cancelAction)
         }
         .font(.system(size: 11))
         .padding(.horizontal, 10)

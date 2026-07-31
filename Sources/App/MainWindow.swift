@@ -26,10 +26,24 @@ struct MainWindow: View {
             panes
             if let progress = state.operations.progress {
                 Divider()
-                OperationProgressBar(progress: progress) { state.operations.cancel() }
+                OperationProgressBar(
+                    progress: progress,
+                    isBackgrounded: state.operationSheet.isBackgrounded,
+                    onCancel: { state.operations.cancel() },
+                    onReveal: { state.operationSheet.showRunning() }
+                )
             }
         }
         .frame(minWidth: 2 * minimumPaneWidth + dividerWidth, minHeight: 400)
+        // A sheet is attached to the window and centred on it, which is where a confirmation
+        // belongs — a free-standing alert lands in the middle of the screen instead.
+        .sheet(isPresented: .constant(state.operationSheet.isPresented)) {
+            OperationSheetView(
+                model: state.operationSheet,
+                progress: state.operations.progress,
+                onCancelOperation: { state.operations.cancel() }
+            )
+        }
         .task { state.start() }
     }
 
