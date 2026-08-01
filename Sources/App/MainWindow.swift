@@ -38,7 +38,6 @@ struct MainWindow: View {
                 )
             }
         }
-        .environment(\.uiScale, scale)
         .frame(minWidth: 2 * minimumPaneWidth + dividerWidth, minHeight: scale(400))
         // A sheet is attached to the window and centred on it, which is where a confirmation
         // belongs — a free-standing alert lands in the middle of the screen instead.
@@ -49,6 +48,9 @@ struct MainWindow: View {
                 onCancelOperation: { state.operations.cancel() }
             )
         }
+        // Outermost, so the sheet is inside it: sheet content is presented from here and takes
+        // the environment as it stands at this point, not as it was inside the VStack.
+        .environment(\.uiScale, scale)
         .task { state.start() }
     }
 

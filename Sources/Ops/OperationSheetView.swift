@@ -6,6 +6,8 @@ struct OperationSheetView: View {
     let progress: FileOperationQueue.Progress?
     let onCancelOperation: () -> Void
 
+    @Environment(\.uiScale) private var scale
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             switch model.stage {
@@ -22,13 +24,16 @@ struct OperationSheetView: View {
             }
         }
         // Wide enough for a full path, which is the whole reason these are not stock alerts.
-        .frame(width: 620)
+        .frame(width: scale(620))
+        // Semantic fonts do not follow a zoom, so the sizes AppKit gives them are spelled out
+        // and scaled: 13 for a headline, 12 for a callout, 10 for a caption.
+        .font(.system(size: scale(13)))
     }
 
     // MARK: - Confirm
 
     private func confirmStage(_ confirmation: Confirmation) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: scale(12)) {
             header(
                 title: confirmation.title,
                 detail: confirmation.detail,
@@ -38,13 +43,15 @@ struct OperationSheetView: View {
 
             if confirmation.destination != nil {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(confirmation.fieldLabel).font(.caption).foregroundStyle(.secondary)
+                    Text(confirmation.fieldLabel)
+                        .font(.system(size: scale(10)))
+                        .foregroundStyle(.secondary)
                     TextField("", text: Binding(
                         get: { model.destinationText },
                         set: { model.destinationText = $0 }
                     ))
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.system(size: scale(12), design: .monospaced))
                     .onSubmit { model.acceptConfirmation() }
                 }
             }
@@ -55,13 +62,13 @@ struct OperationSheetView: View {
 
             if let word = confirmation.requiredWord {
                 HStack(spacing: 8) {
-                    Text("Type \u{201C}\(word)\u{201D} to confirm:").font(.callout)
+                    Text("Type \u{201C}\(word)\u{201D} to confirm:").font(.system(size: scale(12)))
                     TextField("", text: Binding(
                         get: { model.typedConfirmation },
                         set: { model.typedConfirmation = $0 }
                     ))
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 140)
+                    .frame(width: scale(140))
                 }
             }
 
@@ -73,13 +80,13 @@ struct OperationSheetView: View {
                     .disabled(!model.canConfirm(confirmation))
             }
         }
-        .padding(20)
+        .padding(scale(20))
     }
 
     // MARK: - Running
 
     private var runningStage: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: scale(12)) {
             header(
                 title: progress?.title ?? "Working…",
                 detail: progress?.currentItem ?? "",
@@ -94,7 +101,7 @@ struct OperationSheetView: View {
                     ProgressView(value: progress.fraction).progressViewStyle(.linear)
                 }
                 Text(detailLine(progress))
-                    .font(.system(size: 11))
+                    .font(.system(size: scale(11)))
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             } else {
@@ -110,7 +117,7 @@ struct OperationSheetView: View {
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
+        .padding(scale(20))
     }
 
     private func detailLine(_ progress: FileOperationQueue.Progress) -> String {
@@ -130,7 +137,7 @@ struct OperationSheetView: View {
     // MARK: - Conflict
 
     private func conflictStage(_ question: ConflictQuestion) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: scale(12)) {
             header(
                 title: "\u{22}\(question.destination.lastPathComponent)\u{22} already exists",
                 detail:
@@ -163,13 +170,13 @@ struct OperationSheetView: View {
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
+        .padding(scale(20))
     }
 
     // MARK: - Failures
 
     private func failureStage(_ failures: [OperationFailure]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: scale(12)) {
             header(
                 title: failures.count == 1
                     ? "1 item could not be completed"
@@ -184,22 +191,22 @@ struct OperationSheetView: View {
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
+        .padding(scale(20))
     }
 
     // MARK: - Pieces
 
     private func header(title: String, detail: String, symbol: String, tint: Color) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: scale(12)) {
             Image(systemName: symbol)
-                .font(.system(size: 26))
+                .font(.system(size: scale(26)))
                 .foregroundStyle(tint)
-                .frame(width: 32)
+                .frame(width: scale(32))
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.headline)
+                Text(title).font(.system(size: scale(13), weight: .semibold))
                 if !detail.isEmpty {
                     Text(detail)
-                        .font(.callout)
+                        .font(.system(size: scale(12)))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -212,12 +219,12 @@ struct OperationSheetView: View {
     private func pathList(_ lines: [String]) -> some View {
         ScrollView {
             Text(lines.joined(separator: "\n"))
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(size: scale(11), design: .monospaced))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(6)
+                .padding(scale(6))
         }
-        .frame(height: min(200, max(44, CGFloat(lines.count) * 30 + 16)))
+        .frame(height: min(scale(200), max(scale(44), CGFloat(lines.count) * scale(30) + scale(16))))
         .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
@@ -226,7 +233,7 @@ struct OperationSheetView: View {
     }
 
     private func buttons<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: scale(10)) {
             Spacer()
             content()
         }

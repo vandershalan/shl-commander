@@ -44,9 +44,25 @@ private struct UIScaleKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    /// Set once by `MainWindow`; every view below it reads its sizes through this.
+    /// Set once per window; every view below it reads its sizes through this.
     var uiScale: UIScale {
         get { self[UIScaleKey.self] }
         set { self[UIScaleKey.self] = newValue }
     }
+}
+
+/// Publishes the saved zoom into a view tree that does not descend from the main window —
+/// the settings scene, the shortcut list, and anything else in a window of its own.
+///
+/// Reading `AppSettings.shared` here rather than being handed a factor is what keeps those
+/// windows in step: the read registers with `@Observable`, so ⌘+ pressed while one of them is
+/// open resizes it too.
+private struct AppZoom: ViewModifier {
+    func body(content: Content) -> some View {
+        content.environment(\.uiScale, UIScale(factor: AppSettings.shared.uiScale))
+    }
+}
+
+extension View {
+    func appZoom() -> some View { modifier(AppZoom()) }
 }

@@ -1,4 +1,5 @@
 import AppKit
+import Observation
 
 /// A plain read-only viewer for files Quick Look renders poorly or not at all — logs, config
 /// files with unusual extensions, and binaries, which are shown as a hex dump.
@@ -57,12 +58,13 @@ enum InternalViewer {
     }
 
     private static func present(title: String, text: String) {
+        let scale = UIScale(factor: AppSettings.shared.uiScale)
+
         let textView = NSTextView()
         textView.isEditable = false
         textView.isRichText = false
-        textView.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
         textView.string = text
-        textView.textContainerInset = NSSize(width: 8, height: 8)
+        applyZoom(scale, to: textView)
 
         let scroll = NSScrollView()
         scroll.documentView = textView
@@ -76,7 +78,7 @@ enum InternalViewer {
         )
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 760, height: 560),
+            contentRect: NSRect(x: 0, y: 0, width: scale(760), height: scale(560)),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -89,6 +91,7 @@ enum InternalViewer {
         AuxiliaryWindow.centre(window, over: AuxiliaryWindow.referenceWindow())
         AuxiliaryWindow.closeOnEscape(window)
         window.makeKeyAndOrderFront(nil)
+        trackZoom(of: textView, while: window)
 
         // Held so the window is not deallocated the moment this function returns, and dropped
         // again once the user closes it.
@@ -102,6 +105,30 @@ enum InternalViewer {
         ) { [window] _ in
             MainActor.assumeIsolated {
                 windows.removeAll { $0 === window }
+            }
+        }
+    }
+
+    // MARK: - Zoom
+
+    private static func applyZoom(_ scale: UIScale, to textView: NSTextView) {
+        textView.font = NSFont.monospacedSystemFont(ofSize: scale(12), weight: .regular)
+        textView.textContainerInset = NSSize(width: scale(8), height: scale(8))
+    }
+
+    /// Follows ⌘+/⌘- for as long as the viewer is open.
+    ///
+    /// This window is plain AppKit, so it cannot inherit the zoom the way a SwiftUI view does.
+    /// `withObservationTracking` fires once and then has to be re-armed, which is why the
+    /// handler ends by calling this again — and why it stops as soon as the window has gone.
+    private static func trackZoom(of textView: NSTextView, while window: NSWindow) {
+        withObservationTracking {
+            _ = AppSettings.shared.uiScale
+        } onChange: {
+            Task { @MainActor in
+                guard windows.contains(where: { $0 === window }) else { return }
+                applyZoom(UIScale(factor: AppSettings.shared.uiScale), to: textView)
+                trackZoom(of: textView, while: window)
             }
         }
     }

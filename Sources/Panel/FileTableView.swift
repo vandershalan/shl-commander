@@ -61,9 +61,6 @@ struct FileTableView: NSViewRepresentable {
             table.addTableColumn(tableColumn)
         }
 
-        context.coordinator.scale = scale
-        context.coordinator.applyScale(to: table)
-
         table.dataSource = context.coordinator
         table.delegate = context.coordinator
         table.target = context.coordinator
@@ -75,6 +72,11 @@ struct FileTableView: NSViewRepresentable {
         scroll.hasHorizontalScroller = false
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
+
+        // After the table is inside the scroll view: the header lives in the scroll view's own
+        // clip view, so it is only sized once there is one to re-tile.
+        context.coordinator.scale = scale
+        context.coordinator.applyScale(to: table)
         return scroll
     }
 

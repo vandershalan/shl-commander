@@ -4,6 +4,8 @@ import SwiftUI
 struct PreferencesView: View {
     let state: AppState
 
+    private var scale: UIScale { UIScale(factor: AppSettings.shared.uiScale) }
+
     var body: some View {
         TabView {
             GeneralPreferences(state: state)
@@ -11,7 +13,11 @@ struct PreferencesView: View {
             KeyboardPreferences(state: state)
                 .tabItem { Label("Keyboard", systemImage: "keyboard") }
         }
-        .frame(width: 560, height: 420)
+        // Stock controls size themselves off the font they inherit, so one font and one frame
+        // is all this window needs to follow the zoom.
+        .font(.system(size: scale(13)))
+        .appZoom()
+        .frame(width: scale(560), height: scale(420))
     }
 }
 
@@ -112,12 +118,14 @@ private struct KeyboardPreferences: View {
     @State private var monitor: Any?
     @State private var status: String?
 
+    @Environment(\.uiScale) private var scale
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: scale(8)) {
             Text(
                 "Recording replaces a command's bindings. A key already used elsewhere is taken from the other command."
             )
-            .font(.caption)
+            .font(.system(size: scale(10)))
             .foregroundStyle(.secondary)
 
             List(Command.allCases, id: \.self, selection: $selection) { command in
@@ -147,10 +155,10 @@ private struct KeyboardPreferences: View {
             }
 
             if let status {
-                Text(status).font(.caption).foregroundStyle(.secondary)
+                Text(status).font(.system(size: scale(10))).foregroundStyle(.secondary)
             }
         }
-        .padding()
+        .padding(scale(20))
         .onDisappear(perform: stopRecording)
     }
 

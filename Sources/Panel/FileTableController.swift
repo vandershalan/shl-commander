@@ -268,18 +268,32 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// Applies the current scale to everything the table owns rather than the cells do.
     func applyScale(to table: NSTableView) {
         table.rowHeight = scale(Self.baseRowHeight)
+
+        // `headerCell.font` alone leaves the title drawn at the default size, because
+        // `NSTableHeaderCell` renders through its attributed string. Setting that carries the
+        // font and the alignment together.
+        let font = NSFont.systemFont(ofSize: scale(11))
         for column in table.tableColumns {
-            column.headerCell.font = NSFont.systemFont(ofSize: scale(11))
+            let cell = column.headerCell
+            cell.font = font
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = cell.alignment
+            cell.attributedStringValue = NSAttributedString(
+                string: cell.stringValue,
+                attributes: [.font: font, .paragraphStyle: paragraph]
+            )
         }
-        // A header view resizes to whatever frame it is handed, but only picks the height up
-        // when it is (re)installed, so it is replaced rather than resized in place.
-        let header = NSTableHeaderView()
+
+        // A header view draws at whatever height its frame says, but the scroll view is what
+        // reserves the space for it, so it has to be re-tiled afterwards.
+        let header = table.headerView ?? NSTableHeaderView()
         header.frame = NSRect(
             x: 0, y: 0,
-            width: table.bounds.width,
+            width: max(table.bounds.width, header.frame.width),
             height: scale(Self.baseHeaderHeight)
         )
         table.headerView = header
+        table.enclosingScrollView?.tile()
     }
 
     /// Grows or shrinks every column by the ratio between the old scale and the new one.
