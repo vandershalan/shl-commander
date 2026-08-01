@@ -20,6 +20,9 @@ enum ShortcutsWindow {
             return
         }
 
+        // Captured before the panel exists, so it cannot end up centring over itself.
+        let reference = AuxiliaryWindow.referenceWindow()
+
         let panel = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 680),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
@@ -28,8 +31,11 @@ enum ShortcutsWindow {
         )
         panel.title = "Keyboard Shortcuts"
         panel.contentView = hosting
-        panel.center()
         panel.isReleasedWhenClosed = false
+        AuxiliaryWindow.centre(panel, over: reference)
+        // Centred only on creation: re-centring on every open would drag a window the user had
+        // deliberately moved back under the pointer.
+        AuxiliaryWindow.closeOnEscape(panel)
         panel.makeKeyAndOrderFront(nil)
         window = panel
 

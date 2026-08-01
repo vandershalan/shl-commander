@@ -83,8 +83,11 @@ enum InternalViewer {
         )
         window.title = title
         window.contentView = scroll
-        window.center()
         window.isReleasedWhenClosed = false
+        // Same treatment as the shortcut list: centred on the window it came from, and Escape
+        // closes it.
+        AuxiliaryWindow.centre(window, over: AuxiliaryWindow.referenceWindow())
+        AuxiliaryWindow.closeOnEscape(window)
         window.makeKeyAndOrderFront(nil)
 
         // Held so the window is not deallocated the moment this function returns, and dropped
