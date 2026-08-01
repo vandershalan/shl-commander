@@ -74,7 +74,10 @@ final class PanelViewModel: Identifiable {
     private(set) var filter: String = "" {
         didSet {
             guard filter != oldValue else { return }
-            rebuildVisible(holdingCursor())
+            // Typing follows the cursor down to the first match, so narrowing to a single row
+            // leaves Return one keystroke from opening it. An emptied filter is not a request
+            // to move anywhere, so the cursor stays on whatever it had reached.
+            rebuildVisible(filter.isEmpty ? holdingCursor() : .firstMatch)
         }
     }
 
@@ -691,6 +694,9 @@ final class PanelViewModel: Identifiable {
 
     private func restoreCursor(_ target: CursorTarget) {
         switch target {
+        case .firstMatch:
+            cursor = entries.firstIndex { !$0.isParent } ?? 0
+
         case .named(let name):
             guard let name, let index = entries.firstIndex(where: { $0.name == name }) else {
                 cursor = 0
@@ -742,7 +748,10 @@ private enum CursorTarget {
     /// for: entering a directory, or landing on something just created or renamed.
     case named(String?)
     /// Do not move. Stay on the same row, and if it has gone, take the nearest surviving row
-    /// above where it was. For reloads, re-sorts, and filter changes — nothing there is a
-    /// request to move the cursor.
+    /// above where it was. For reloads and re-sorts — nothing there is a request to move the
+    /// cursor.
     case hold(previousNames: [String], previousIndex: Int)
+    /// Land on the first row that is not "..". For quick-filter typing, where the point is to
+    /// walk the cursor onto what was typed.
+    case firstMatch
 }

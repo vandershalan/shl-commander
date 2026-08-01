@@ -37,6 +37,56 @@ struct QuickFilterSessionTests {
         #expect(panel.entries.map(\.name) == ["..", "beta.txt"])
     }
 
+    @Test("typing walks the cursor onto the first match")
+    func cursorFollowsTheFilter() async throws {
+        let tree = try TempTree("session-cursor")
+        defer { tree.remove() }
+        let panel = try await panel(in: tree)
+        // The cursor starts on "..", which is never what was typed.
+        #expect(panel.cursorEntry?.name == "..")
+
+        panel.appendToFilter("b")
+        #expect(panel.entries.map(\.name) == ["..", "sub", "beta.txt"])
+        #expect(panel.cursorEntry?.name == "sub")
+
+        // Narrowed to one row, so Return is all that is left to open it.
+        panel.appendToFilter("e")
+        #expect(panel.entries.map(\.name) == ["..", "beta.txt"])
+        #expect(panel.cursorEntry?.name == "beta.txt")
+    }
+
+    @Test("backspacing away the filter leaves the cursor where it got to")
+    func cursorHoldsWhenTheFilterEmpties() async throws {
+        let tree = try TempTree("session-cursor-back")
+        defer { tree.remove() }
+        let panel = try await panel(in: tree)
+
+        panel.setFilter("beta")
+        #expect(panel.cursorEntry?.name == "beta.txt")
+
+        // Emptying the text is not a request to go anywhere, so the row it reached stays.
+        panel.setFilter("")
+        #expect(panel.cursorEntry?.name == "beta.txt")
+    }
+
+    @Test("Return on a filtered-to-one folder enters it")
+    func returnOpensTheLastMatch() async throws {
+        let tree = try TempTree("session-open")
+        defer { tree.remove() }
+        try tree.file("sub/inner.txt", bytes: 1)
+        let panel = try await panel(in: tree)
+
+        for character in "sub" { panel.appendToFilter(character) }
+        #expect(panel.entries.map(\.name) == ["..", "sub"])
+
+        panel.openCursor()
+        await panel.settle()
+        #expect(panel.directory.lastPathComponent == "sub")
+        // Entering a folder ends the session; the text no longer describes what is on screen.
+        #expect(panel.isFiltering == false)
+        #expect(panel.entries.map(\.name).contains("inner.txt"))
+    }
+
     @Test("backspacing to empty keeps the session open")
     func backspaceToEmptyKeepsSession() async throws {
         let tree = try TempTree("session-backspace")

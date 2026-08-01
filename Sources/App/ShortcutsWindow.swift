@@ -26,8 +26,10 @@ enum ShortcutsWindow {
         // Sized for the zoom in force when it first opens; after that the user's own resizing
         // wins, so a later ⌘+ reflows the list inside whatever size the window has.
         let scale = UIScale(factor: AppSettings.shared.uiScale)
+        // Narrow on purpose: a command name and its keys are a short line, and a wide window
+        // strands them at opposite edges with nothing in between to follow.
         let panel = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: scale(620), height: scale(680)),
+            contentRect: NSRect(x: 0, y: 0, width: scale(460), height: scale(680)),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
