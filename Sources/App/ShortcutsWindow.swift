@@ -53,6 +53,7 @@ struct ShortcutsView: View {
     let keymap: Keymap
 
     @State private var query = ""
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -75,6 +76,12 @@ struct ShortcutsView: View {
                 .padding(16)
             }
         }
+        .task {
+            // Yielding first lets the window finish becoming key: a focus request made while the
+            // window still cannot take focus is simply dropped, and the field stays inert.
+            await Task.yield()
+            isSearchFocused = true
+        }
     }
 
     private var searchField: some View {
@@ -82,6 +89,9 @@ struct ShortcutsView: View {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
             TextField("Filter commands or keys", text: $query)
                 .textFieldStyle(.plain)
+                // Focused on open, so the window can be typed into straight away — which is the
+                // point of having a search field on a list this long.
+                .focused($isSearchFocused)
             if !query.isEmpty {
                 Button {
                     query = ""
