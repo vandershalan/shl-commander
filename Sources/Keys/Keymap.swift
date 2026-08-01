@@ -88,6 +88,11 @@ extension Keymap {
         .clearFilter: [chord("escape")],
         .measureSelectedDirectories: [chord("ctrl+l"), chord("cmd+l")],
         .measureAllDirectories: [chord("opt+shift+return"), chord("cmd+shift+l")],
+        // The Mac's own zoom keys. ⌘+ is ⇧⌘= on most layouts, so both spellings are bound —
+        // the menu shows ⌘=, which is what AppKit can draw as a key equivalent.
+        .zoomIn: [chord("cmd+equal"), chord("cmd+shift+equal")],
+        .zoomOut: [chord("cmd+minus")],
+        .resetZoom: [chord("cmd+0")],
 
         .markToggle: [chord("space")],
         // Most Mac keyboards have no Insert key, so ⇧Space carries the same meaning.

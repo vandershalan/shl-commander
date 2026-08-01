@@ -23,6 +23,8 @@ cursor that never wanders, marks kept separate from the cursor, and a command fo
 - **Live panes.** Each watches its own directory through FSEvents and reloads on change,
   keeping the cursor and the marks.
 - **Session restore**: tabs, paths, sort, and focus come back on relaunch.
+- **Zoom** on the standard Mac keys (`⌘+`, `⌘-`, `⌘0`). Rows, fonts, icons and columns scale
+  together, and the setting survives a relaunch.
 - Quick Look (`F3`), an internal text/hex viewer, Open in Terminal, Reveal in Finder.
 - **A searchable shortcut list** (`F1` or `⌘/`), built from the live keymap, so it cannot fall
   out of step with what the keys actually do.
@@ -140,6 +142,8 @@ setting. Holding `fn` works too.
 | Refresh | `F2`, `⌃R` | `⌘R` |
 | Sort by name / ext / date / size | `⌃F3` / `⌃F4` / `⌃F5` / `⌃F6` | `⌘⌥1`–`⌘⌥4` |
 | Show hidden files | `⌃H` | `⌘⇧.` |
+| Zoom in / out | | `⌘+` / `⌘-` |
+| Actual size | | `⌘0` |
 | Mark | `Space` | |
 | Mark and advance | `Insert` | `⇧Space` |
 | Mark / unmark by pattern | keypad `+` / keypad `-` | |

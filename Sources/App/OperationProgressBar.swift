@@ -8,6 +8,8 @@ struct OperationProgressBar: View {
     let onCancel: () -> Void
     let onReveal: () -> Void
 
+    @Environment(\.uiScale) private var scale
+
     var body: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
@@ -40,9 +42,9 @@ struct OperationProgressBar: View {
             }
             Button("Cancel", action: onCancel)
         }
-        .font(.system(size: 11))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .font(.system(size: scale(11)))
+        .padding(.horizontal, scale(10))
+        .padding(.vertical, scale(6))
         .background(.bar)
     }
 

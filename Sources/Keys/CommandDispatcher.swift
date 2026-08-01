@@ -86,6 +86,12 @@ struct CommandDispatcher {
             panel.measureSelectedDirectories()
         case .measureAllDirectories:
             panel.measureAllDirectories()
+        case .zoomIn:
+            state.settings.uiScale = UIScale.zoomedIn(from: state.settings.uiScale)
+        case .zoomOut:
+            state.settings.uiScale = UIScale.zoomedOut(from: state.settings.uiScale)
+        case .resetZoom:
+            state.settings.uiScale = UIScale.standard.factor
 
         // Marking
         case .markToggle:

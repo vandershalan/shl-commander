@@ -14,6 +14,8 @@ struct FileTableView: NSViewRepresentable {
     let directorySizes: [URL: Int64]
     let measuringDirectories: Set<URL>
     let sort: SortOrder
+    /// Row height, fonts, icons and column widths all come off this.
+    let scale: UIScale
     /// Drives first-responder handoff between the two panes.
     let isActive: Bool
     /// Opens the in-place editor when this counter changes.
@@ -33,7 +35,6 @@ struct FileTableView: NSViewRepresentable {
         let table = FileTable()
         table.style = .fullWidth
         table.rowSizeStyle = .custom
-        table.rowHeight = 20
         table.intercellSpacing = NSSize(width: 0, height: 0)
         table.usesAlternatingRowBackgroundColors = true
         table.allowsColumnReordering = false
@@ -46,19 +47,22 @@ struct FileTableView: NSViewRepresentable {
         table.focusRingType = .none
         // Name is the only flexible column, so slack goes there.
         table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
-        table.headerView = NSTableHeaderView()
+        // The header itself is installed by `applyScale`, which sizes it.
 
         for column in FileTableController.ColumnID.allCases {
             let (width, minWidth) = column.widths
             let tableColumn = NSTableColumn(identifier: .init(column.rawValue))
             tableColumn.title = column.title
-            tableColumn.width = width
-            tableColumn.minWidth = minWidth
+            tableColumn.width = scale(width)
+            tableColumn.minWidth = scale(minWidth)
             tableColumn.headerCell.alignment = column.alignment
             tableColumn.sortDescriptorPrototype =
                 NSSortDescriptor(key: column.rawValue, ascending: true)
             table.addTableColumn(tableColumn)
         }
+
+        context.coordinator.scale = scale
+        context.coordinator.applyScale(to: table)
 
         table.dataSource = context.coordinator
         table.delegate = context.coordinator
@@ -86,6 +90,16 @@ struct FileTableView: NSViewRepresentable {
         table.keyHandler = onKeyDown
         table.onMove = onMove
         table.onBecomeFirstResponder = onActivate
+
+        if controller.scale != scale {
+            // Columns are resized in proportion to the zoom step rather than reset to their
+            // defaults, so a column the user widened stays wide relative to the others.
+            controller.rescaleColumns(on: table, to: scale)
+            controller.scale = scale
+            controller.applyScale(to: table)
+            // Cells are cached per scale, so this is what swaps in the newly sized ones.
+            controller.reloadRows(on: table)
+        }
 
         if controller.listingID != listingID {
             controller.listingID = listingID

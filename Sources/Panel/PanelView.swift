@@ -10,6 +10,8 @@ struct PanelView: View {
     /// Every key press goes to `KeyRouter`; the panel itself binds nothing.
     let onKeyDown: (NSEvent) -> Bool
 
+    @Environment(\.uiScale) private var scale
+
     var body: some View {
         VStack(spacing: 0) {
             if panel.hasMultipleTabs {
@@ -26,6 +28,7 @@ struct PanelView: View {
                 directorySizes: panel.sizer.sizes,
                 measuringDirectories: panel.measuringDirectories,
                 sort: panel.sort,
+                scale: scale,
                 isActive: isActive,
                 renameRequestID: panel.renameRequestID,
                 onCursorChange: { panel.cursor = $0 },
@@ -79,12 +82,12 @@ struct PanelView: View {
                 // Marks the pane as looking inside a file rather than at a folder, and says
                 // plainly that nothing here can be written to.
                 Image(systemName: "doc.zipper")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: scale(10), weight: .semibold))
                     .foregroundStyle(.secondary)
                     .help(panel.archiveNote ?? "Inside an archive — read-only")
             }
             Text(panel.displayPath)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: scale(12), weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.head)
                 .help(panel.displayPath)
@@ -93,8 +96,8 @@ struct PanelView: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 24)
+        .padding(.horizontal, scale(8))
+        .frame(height: scale(24))
         .background(isActive ? Color.accentColor.opacity(0.18) : Color.clear)
     }
 
@@ -126,7 +129,7 @@ struct PanelView: View {
             }
         } label: {
             Text(volumes.volume(containing: panel.directory)?.name ?? "Volume")
-                .font(.system(size: 11))
+                .font(.system(size: scale(11)))
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -150,10 +153,10 @@ struct PanelView: View {
             }
             Spacer(minLength: 0)
         }
-        .font(.system(size: 11))
+        .font(.system(size: scale(11)))
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 8)
-        .frame(height: 22)
+        .padding(.horizontal, scale(8))
+        .frame(height: scale(22))
     }
 
     private var selectionSummary: String {

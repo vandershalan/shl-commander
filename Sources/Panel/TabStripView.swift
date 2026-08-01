@@ -7,6 +7,8 @@ struct TabStripView: View {
     let isActive: Bool
     let onActivate: () -> Void
 
+    @Environment(\.uiScale) private var scale
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 2) {
@@ -14,9 +16,9 @@ struct TabStripView: View {
                     tabButton(tab, index: index)
                 }
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, scale(4))
         }
-        .frame(height: 22)
+        .frame(height: scale(22))
         .background(Color(nsColor: .underPageBackgroundColor))
     }
 
@@ -28,7 +30,7 @@ struct TabStripView: View {
         } label: {
             HStack(spacing: 4) {
                 Text(tab.title)
-                    .font(.system(size: 11, weight: selected ? .semibold : .regular))
+                    .font(.system(size: scale(11), weight: selected ? .semibold : .regular))
                     .lineLimit(1)
                 if selected, panel.hasMultipleTabs {
                     Button {
@@ -36,14 +38,14 @@ struct TabStripView: View {
                         panel.closeActiveTab()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 7, weight: .bold))
+                            .font(.system(size: scale(7), weight: .bold))
                     }
                     .buttonStyle(.plain)
                     .help("Close tab")
                 }
             }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
+            .padding(.horizontal, scale(7))
+            .padding(.vertical, scale(2))
             .background(
                 selected
                     ? (isActive ? Color.accentColor.opacity(0.30) : Color.secondary.opacity(0.20))

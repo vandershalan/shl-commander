@@ -41,6 +41,9 @@ enum Command: String, CaseIterable, Codable, Sendable {
     case clearFilter
     case measureSelectedDirectories
     case measureAllDirectories
+    case zoomIn
+    case zoomOut
+    case resetZoom
 
     // Marking
     case markToggle
@@ -111,6 +114,9 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .clearFilter: return "Clear Filter"
         case .measureSelectedDirectories: return "Measure Selected Folders"
         case .measureAllDirectories: return "Measure All Folders"
+        case .zoomIn: return "Zoom In"
+        case .zoomOut: return "Zoom Out"
+        case .resetZoom: return "Actual Size"
         case .markToggle: return "Mark"
         case .markToggleAndAdvance: return "Mark and Advance"
         case .markByPattern: return "Mark by Pattern…"
@@ -143,7 +149,8 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .switchPane, .openCursor, .goUp, .goToVolumeRoot, .historyBack, .historyForward:
             return .go
         case .refresh, .sortByName, .sortByExtension, .sortByDate, .sortBySize, .toggleHidden,
-            .clearFilter, .measureSelectedDirectories, .measureAllDirectories:
+            .clearFilter, .measureSelectedDirectories, .measureAllDirectories,
+            .zoomIn, .zoomOut, .resetZoom:
             return .view
         case .markToggle, .markToggleAndAdvance, .markByPattern, .unmarkByPattern, .invertMarks,
             .markAll, .markNone:

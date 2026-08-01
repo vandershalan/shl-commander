@@ -15,6 +15,8 @@ struct FavoritesBarView: View {
     /// Favourite being dragged, so a drop knows what to move.
     @State private var dragging: Favorite?
 
+    @Environment(\.uiScale) private var scale
+
     var body: some View {
         HStack(spacing: 4) {
             ScrollView(.horizontal, showsIndicators: false) {
@@ -39,15 +41,15 @@ struct FavoritesBarView: View {
             HStack(spacing: 4) {
                 if number <= 9 {
                     Text("\u{2318}\(number)")
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: scale(9), weight: .medium))
                         .foregroundStyle(.tertiary)
                 }
                 Text(favorite.name)
-                    .font(.system(size: 11))
+                    .font(.system(size: scale(11)))
                     .lineLimit(1)
             }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 2)
+            .padding(.horizontal, scale(7))
+            .padding(.vertical, scale(2))
             .background(Color.secondary.opacity(0.15), in: Capsule())
             // A folder that has been moved or deleted is dimmed rather than silently dead.
             .opacity(favorite.exists ? 1 : 0.45)

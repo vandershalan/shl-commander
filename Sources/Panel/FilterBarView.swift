@@ -11,32 +11,34 @@ struct FilterBarView: View {
     let matchCount: Int
     let isActive: Bool
 
+    @Environment(\.uiScale) private var scale
+
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: scale(6)) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: scale(10), weight: .semibold))
 
             HStack(spacing: 0) {
                 Text(text)
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(.system(size: scale(12), weight: .semibold, design: .monospaced))
                 // A caret makes it obvious this is a live text field and not a static label.
                 Rectangle()
                     .fill(isActive ? Color.accentColor : Color.secondary)
-                    .frame(width: 1.5, height: 13)
+                    .frame(width: 1.5, height: scale(13))
                     .padding(.leading, 1)
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: scale(8))
 
             Text(matchLabel)
-                .font(.system(size: 11))
+                .font(.system(size: scale(11)))
                 .foregroundStyle(matchCount == 0 && !text.isEmpty ? .red : .secondary)
             Text("Esc to clear")
-                .font(.system(size: 10))
+                .font(.system(size: scale(10)))
                 .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 8)
-        .frame(height: 22)
+        .padding(.horizontal, scale(8))
+        .frame(height: scale(22))
         .background(
             (isActive ? Color.accentColor : Color.secondary).opacity(0.22)
         )

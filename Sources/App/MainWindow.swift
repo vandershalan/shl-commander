@@ -11,8 +11,12 @@ struct MainWindow: View {
     /// Divider fraction at the moment the current drag started, or nil when idle.
     @State private var dragStartFraction: Double?
 
-    /// Keeps either pane from being dragged down to an unusable sliver.
-    private let minimumPaneWidth: CGFloat = 260
+    /// Everything the window draws is sized through this, so ⌘+/⌘- rescale the lot.
+    private var scale: UIScale { UIScale(factor: state.settings.uiScale) }
+
+    /// Keeps either pane from being dragged down to an unusable sliver. Scaled with the rest:
+    /// the columns inside a pane grow too, and a 260pt pane cannot hold them at ⌘+.
+    private var minimumPaneWidth: CGFloat { scale(260) }
     private let dividerWidth: CGFloat = 6
 
     private var router: KeyRouter {
@@ -34,7 +38,8 @@ struct MainWindow: View {
                 )
             }
         }
-        .frame(minWidth: 2 * minimumPaneWidth + dividerWidth, minHeight: 400)
+        .environment(\.uiScale, scale)
+        .frame(minWidth: 2 * minimumPaneWidth + dividerWidth, minHeight: scale(400))
         // A sheet is attached to the window and centred on it, which is where a confirmation
         // belongs — a free-standing alert lands in the middle of the screen instead.
         .sheet(isPresented: .constant(state.operationSheet.isPresented)) {
@@ -60,7 +65,7 @@ struct MainWindow: View {
                 onAddCurrent: { dispatcher.perform(.addFavorite) }
             )
 
-            Divider().frame(height: 14)
+            Divider().frame(height: scale(14))
 
             Button {
                 dispatcher.perform(.toggleHidden)
@@ -85,8 +90,9 @@ struct MainWindow: View {
             .buttonStyle(.borderless)
             .help("Keyboard shortcuts (\u{2318}/)")
         }
-        .padding(.horizontal, 8)
-        .frame(height: 26)
+        .font(.system(size: scale(13)))
+        .padding(.horizontal, scale(8))
+        .frame(height: scale(26))
         .background(.bar)
     }
 
@@ -131,7 +137,7 @@ struct MainWindow: View {
             .overlay(
                 Rectangle()
                     .fill(Color(nsColor: .tertiaryLabelColor))
-                    .frame(width: 1, height: 24)
+                    .frame(width: 1, height: scale(24))
             )
             .onHover { inside in
                 if inside {

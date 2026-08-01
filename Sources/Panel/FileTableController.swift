@@ -143,8 +143,19 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
     private var isSyncingSelection = false
     private var isSyncingSort = false
 
-    private static let rowFont = NSFont.systemFont(ofSize: 12)
-    private static let numericFont = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+    /// Interface zoom, pushed in by `FileTableView`. Everything the table draws is sized off
+    /// it, so ⌘+/⌘- move the rows, fonts and icons together.
+    var scale = UIScale.standard
+
+    private var rowFont: NSFont { NSFont.systemFont(ofSize: scale(12)) }
+    private var numericFont: NSFont {
+        NSFont.monospacedDigitSystemFont(ofSize: scale(12), weight: .regular)
+    }
+
+    /// Unscaled row height and icon edge; the scaled values follow from these.
+    private static let baseRowHeight: CGFloat = 20
+    private static let baseIconSize: CGFloat = 16
+    private static let baseHeaderHeight: CGFloat = 24
 
     // MARK: - Data source
 
@@ -162,7 +173,10 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
         else { return nil }
 
         let entry = entries[row]
-        let identifier = NSUserInterfaceItemIdentifier(raw)
+        // The scale rides in the identifier because a cell's icon size and insets are fixed by
+        // constraints when it is built. Keying the reuse pool on it means a zoom hands back
+        // freshly built cells instead of ones laid out for the old size.
+        let identifier = NSUserInterfaceItemIdentifier("\(raw)@\(Int(scale.factor * 100))")
         let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView
             ?? makeCell(column: column, identifier: identifier)
 
@@ -184,7 +198,7 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
 
         let isMarked = marks.contains(entry.url)
         cell.textField?.textColor = Self.color(for: entry, column: column, marked: isMarked)
-        cell.textField?.font = Self.font(for: column, marked: isMarked)
+        cell.textField?.font = font(for: column, marked: isMarked)
         return cell
     }
 
@@ -199,7 +213,7 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
     }
 
     /// Bold reinforces the mark colour for anyone who cannot rely on red alone.
-    private static func font(for column: ColumnID, marked: Bool) -> NSFont {
+    private func font(for column: ColumnID, marked: Bool) -> NSFont {
         let base = column == .name || column == .ext ? rowFont : numericFont
         guard marked else { return base }
         return NSFontManager.shared.convert(base, toHaveTrait: .boldFontMask)
@@ -210,7 +224,7 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
         cell.identifier = identifier
 
         let field = NSTextField(labelWithString: "")
-        field.font = column == .name || column == .ext ? Self.rowFont : Self.numericFont
+        field.font = column == .name || column == .ext ? rowFont : numericFont
         field.alignment = column.alignment
         field.lineBreakMode = .byTruncatingTail
         field.translatesAutoresizingMaskIntoConstraints = false
@@ -219,8 +233,8 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
 
         guard column == .name else {
             NSLayoutConstraint.activate([
-                field.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 4),
-                field.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -6),
+                field.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: scale(4)),
+                field.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -scale(6)),
                 field.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             ])
             return cell
@@ -236,16 +250,51 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
         cell.addSubview(icon)
         cell.imageView = icon
 
+        let iconSize = scale(Self.baseIconSize)
         NSLayoutConstraint.activate([
-            icon.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 3),
+            icon.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: scale(3)),
             icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 16),
-            icon.heightAnchor.constraint(equalToConstant: 16),
-            field.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 5),
-            field.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+            icon.widthAnchor.constraint(equalToConstant: iconSize),
+            icon.heightAnchor.constraint(equalToConstant: iconSize),
+            field.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: scale(5)),
+            field.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -scale(4)),
             field.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
         ])
         return cell
+    }
+
+    // MARK: - Zoom
+
+    /// Applies the current scale to everything the table owns rather than the cells do.
+    func applyScale(to table: NSTableView) {
+        table.rowHeight = scale(Self.baseRowHeight)
+        for column in table.tableColumns {
+            column.headerCell.font = NSFont.systemFont(ofSize: scale(11))
+        }
+        // A header view resizes to whatever frame it is handed, but only picks the height up
+        // when it is (re)installed, so it is replaced rather than resized in place.
+        let header = NSTableHeaderView()
+        header.frame = NSRect(
+            x: 0, y: 0,
+            width: table.bounds.width,
+            height: scale(Self.baseHeaderHeight)
+        )
+        table.headerView = header
+    }
+
+    /// Grows or shrinks every column by the ratio between the old scale and the new one.
+    ///
+    /// Call before `scale` is updated: the ratio is measured against the scale the current
+    /// widths were laid out at.
+    func rescaleColumns(on table: NSTableView, to newScale: UIScale) {
+        let ratio = newScale.factor / scale.factor
+        for column in table.tableColumns {
+            let identifier = ColumnID(rawValue: column.identifier.rawValue)
+            let width = column.width * ratio
+            // Minimums move first when shrinking, or the old floor would hold the width up.
+            column.minWidth = newScale(identifier?.widths.1 ?? column.minWidth)
+            column.width = width
+        }
     }
 
     // MARK: - Delegate

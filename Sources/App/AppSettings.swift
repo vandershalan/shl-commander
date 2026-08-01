@@ -17,7 +17,9 @@ final class AppSettings {
         defaults.register(defaults: [
             Key.restoreSession: true,
             Key.showHiddenByDefault: false,
+            Key.uiScale: UIScale.standard.factor,
         ])
+        self.uiScale = Self.clamped(defaults.double(forKey: Key.uiScale))
     }
 
     private enum Key {
@@ -26,6 +28,30 @@ final class AppSettings {
         static let editorBundleIdentifier = "editorBundleIdentifier"
         static let leftStartDirectory = "leftStartDirectory"
         static let rightStartDirectory = "rightStartDirectory"
+        static let uiScale = "uiScale"
+    }
+
+    /// Interface zoom, driven by ⌘+, ⌘- and ⌘0.
+    ///
+    /// Stored rather than read straight back out of `UserDefaults` like the settings above:
+    /// `@Observable` only tracks stored properties, and the whole window has to redraw the
+    /// moment this changes.
+    var uiScale: Double {
+        didSet {
+            let clamped = Self.clamped(uiScale)
+            guard clamped == uiScale else {
+                uiScale = clamped
+                return
+            }
+            defaults.set(uiScale, forKey: Key.uiScale)
+        }
+    }
+
+    /// A factor outside the step range — hand-edited into the defaults, or written by an
+    /// older build — is pulled back to the nearest end rather than honoured.
+    private static func clamped(_ factor: Double) -> Double {
+        guard factor > 0 else { return UIScale.standard.factor }
+        return min(max(factor, UIScale.minimum), UIScale.maximum)
     }
 
     /// When off, both panes open at the configured start directories instead.
