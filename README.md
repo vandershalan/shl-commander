@@ -28,6 +28,9 @@ cursor that never wanders, marks kept separate from the cursor, and a command fo
 - **Cloud folders and network shares.** OneDrive, iCloud Drive, Google Drive and anything else
   with a File Provider are listed beside the volumes; `⌘K` mounts SMB (and AFP, NFS, FTP,
   WebDAV) shares and remembers them.
+- **Drag and drop**, in and out: between the panes, onto a folder row, to and from the Finder
+  and any app that takes files. Same volume moves, across volumes copies, `⌥` forces a copy and
+  `⌘` a move.
 - Quick Look (`F3`), an internal text/hex viewer, Open in Terminal, Reveal in Finder.
 - **A searchable shortcut list** (`F1` or `⌘/`), built from the live keymap, so it cannot fall
   out of step with what the keys actually do.
@@ -224,6 +227,23 @@ Reading is done by `/usr/bin/tar`, which on macOS is bsdtar over libarchive, and
 `bzip2` for streams — no third-party archive library is vendored. `xz` and `zstd` streams need
 those tools installed (Homebrew); the app says which one is missing rather than failing
 obscurely.
+
+### Drag and drop
+
+Dragging a marked row takes every marked row with it; dragging an unmarked one takes only that
+row, so a drag never picks up marks left somewhere off screen. Files can go to the other pane,
+to the Finder, or to any app that accepts file URLs — and can come back the same way.
+
+A drop over a folder row lands in that folder, a drop anywhere else lands in the pane's own
+folder, and a drop on `..` moves a level up. What happens follows the Finder: within one volume
+a drag **moves**, across volumes it **copies**, `⌥` forces a copy and `⌘` forces a move. The
+drop is then confirmed through the same dialog `F5` and `F6` use, with the destination prefilled
+and editable — a drop that landed on the wrong folder is corrected there rather than undone.
+
+Impossible drops are refused before they start: a folder into itself or into its own subfolder,
+files into the folder they are already in, and anything at all into an archive, which is
+read-only. Archive members cannot be dragged out either — they have no path on disk until they
+are extracted, so `F5` is what copies them out.
 
 ### Cloud folders and network shares
 

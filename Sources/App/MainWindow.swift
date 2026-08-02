@@ -110,6 +110,7 @@ struct MainWindow: View {
                     cloud: state.cloud,
                     isActive: state.active == .left,
                     onConnectToServer: { connectToServer() },
+                    onDrop: accept(drop:to:copying:),
                     onActivate: { state.active = .left },
                     onKeyDown: router.handle
                 )
@@ -123,12 +124,17 @@ struct MainWindow: View {
                     cloud: state.cloud,
                     isActive: state.active == .right,
                     onConnectToServer: { connectToServer() },
+                    onDrop: accept(drop:to:copying:),
                     onActivate: { state.active = .right },
                     onKeyDown: router.handle
                 )
                 .frame(maxWidth: .infinity)
             }
         }
+    }
+
+    private func accept(drop urls: [URL], to destination: URL, copying: Bool) {
+        CommandDispatcher(state: state).acceptDrop(urls, onto: destination, copying: copying)
     }
 
     private func connectToServer() {

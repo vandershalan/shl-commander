@@ -9,6 +9,8 @@ struct PanelView: View {
     let isActive: Bool
     /// Opens the Connect to Server window, which belongs to no one pane.
     let onConnectToServer: () -> Void
+    /// Files dropped on this pane, and where they should land.
+    let onDrop: (_ urls: [URL], _ destination: URL, _ copying: Bool) -> Void
     let onActivate: () -> Void
     /// Every key press goes to `KeyRouter`; the panel itself binds nothing.
     let onKeyDown: (NSEvent) -> Bool
@@ -55,7 +57,15 @@ struct PanelView: View {
                         ])
                     }
                 },
-                onKeyDown: onKeyDown
+                onKeyDown: onKeyDown,
+                dragSources: { panel.dragSources(at: $0) },
+                dropDestination: { panel.dropDestination(row: $0) },
+                onDrop: { urls, destination, copying in
+                    // The pane a drop lands on becomes the active one, so the follow-up
+                    // confirmation talks about the pane the user was pointing at.
+                    onActivate()
+                    onDrop(urls, destination, copying)
+                }
             )
             if panel.isFiltering {
                 Divider()

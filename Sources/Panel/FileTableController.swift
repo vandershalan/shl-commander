@@ -133,6 +133,13 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
     var onSort: (SortKey, Bool) -> Void = { _, _ in }
     var onRename: (Int, String) -> Void = { _, _ in }
 
+    /// URLs a drag from this row should carry; empty means the row cannot be dragged.
+    var dragSources: (Int) -> [URL] = { _ in [] }
+    /// The folder a drop over this row belongs in, or nil when the pane refuses drops.
+    var dropDestination: (Int?) -> URL? = { _ in nil }
+    /// Runs an accepted drop. `copying` is false for a move.
+    var onDrop: (_ urls: [URL], _ destination: URL, _ copying: Bool) -> Void = { _, _, _ in }
+
     /// Last rename request the table has acted on, so a bumped counter triggers exactly once.
     var handledRenameRequest = 0
     private var editingRow: Int?
@@ -332,6 +339,139 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
 
     @objc func handleDoubleClick(_ sender: Any?) {
         onOpen()
+    }
+
+    // MARK: - Drag and drop
+
+    func tableView(
+        _ tableView: NSTableView,
+        pasteboardWriterForRow row: Int
+    ) -> (any NSPasteboardWriting)? {
+        guard let url = dragSources(row).first else { return nil }
+        return url as NSURL
+    }
+
+    /// Replaces the pasteboard when the dragged row is one of several marked ones.
+    ///
+    /// `pasteboardWriterForRow` is asked once per *selected* row, and this table's selection is
+    /// a single cursor — marks are kept separate from it, so the marked set has to be written
+    /// here or a drag would carry only the row under the pointer.
+    func tableView(
+        _ tableView: NSTableView,
+        draggingSession session: NSDraggingSession,
+        willBeginAt screenPoint: NSPoint,
+        forRowIndexes rowIndexes: IndexSet
+    ) {
+        guard let row = rowIndexes.first else { return }
+        let urls = dragSources(row)
+        guard urls.count > 1 else { return }
+        session.draggingPasteboard.clearContents()
+        session.draggingPasteboard.writeObjects(urls.map { $0 as NSURL })
+    }
+
+    func tableView(
+        _ tableView: NSTableView,
+        validateDrop info: any NSDraggingInfo,
+        proposedRow row: Int,
+        proposedDropOperation dropOperation: NSTableView.DropOperation
+    ) -> NSDragOperation {
+        let urls = Self.fileURLs(on: info.draggingPasteboard)
+        guard !urls.isEmpty else { return [] }
+
+        // A drop between two rows means nothing here — rows are not an order the user controls —
+        // so it is retargeted onto the folder itself, which is what the gap sits in.
+        let targetRow = dropOperation == .on ? row : nil
+        guard let destination = destination(forRow: targetRow, urls: urls) else { return [] }
+
+        let paneDirectory = dropDestination(nil)?.standardizedFileURL
+        if targetRow == nil || destination.standardizedFileURL == paneDirectory {
+            tableView.setDropRow(-1, dropOperation: .on)
+        }
+
+        let operation = Self.operation(
+            dragging: urls, to: destination, allowed: info.draggingSourceOperationMask)
+        // Moving files into the folder they are already in would do nothing, so the drop is
+        // refused outright rather than accepted and then quietly dropped.
+        if operation == .move, Self.allSit(in: destination, urls) { return [] }
+        return operation
+    }
+
+    func tableView(
+        _ tableView: NSTableView,
+        acceptDrop info: any NSDraggingInfo,
+        row: Int,
+        dropOperation: NSTableView.DropOperation
+    ) -> Bool {
+        let urls = Self.fileURLs(on: info.draggingPasteboard)
+        guard !urls.isEmpty else { return false }
+        let targetRow = dropOperation == .on && row >= 0 ? row : nil
+        guard let destination = destination(forRow: targetRow, urls: urls) else { return false }
+
+        let operation = Self.operation(
+            dragging: urls, to: destination, allowed: info.draggingSourceOperationMask)
+        guard operation != [] else { return false }
+        onDrop(urls, destination, operation.contains(.copy))
+        return true
+    }
+
+    /// The destination for a drop, with the impossible ones refused: a folder cannot be put
+    /// inside itself, nor anywhere below itself.
+    private func destination(forRow row: Int?, urls: [URL]) -> URL? {
+        guard let destination = dropDestination(row) else { return nil }
+        let target = destination.standardizedFileURL.path
+        for url in urls {
+            let source = url.standardizedFileURL.path
+            if target == source || target.hasPrefix(source + "/") { return nil }
+        }
+        return destination
+    }
+
+    static func allSit(in directory: URL, _ urls: [URL]) -> Bool {
+        let target = directory.standardizedFileURL
+        return urls.allSatisfy {
+            $0.deletingLastPathComponent().standardizedFileURL == target
+        }
+    }
+
+    static func fileURLs(on pasteboard: NSPasteboard) -> [URL] {
+        let objects = pasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: [.urlReadingFileURLsOnly: true]
+        )
+        return (objects as? [URL]) ?? []
+    }
+
+    /// The Finder's rule: a drag within one volume moves, across volumes it copies. ⌥ forces a
+    /// copy and ⌘ forces a move, so either can be had wherever the drag came from.
+    static func operation(
+        dragging urls: [URL],
+        to destination: URL,
+        allowed: NSDragOperation,
+        modifiers: NSEvent.ModifierFlags = NSEvent.modifierFlags
+    ) -> NSDragOperation {
+        if modifiers.contains(.option), allowed.contains(.copy) { return .copy }
+        if modifiers.contains(.command), allowed.contains(.move) { return .move }
+
+        let sameVolume = urls.allSatisfy { volume(of: $0) == volume(of: destination) }
+        if sameVolume, allowed.contains(.move) { return .move }
+        if allowed.contains(.copy) { return .copy }
+        return allowed.contains(.move) ? .move : []
+    }
+
+    /// The mount point a path belongs to.
+    ///
+    /// Walks up when the path itself cannot be read: a drag can name a file that has just been
+    /// moved away, and answering "unknown volume" for it would turn every such drag into a copy.
+    private static func volume(of url: URL) -> String? {
+        var probe = url.standardizedFileURL
+        while true {
+            if let volume = try? probe.resourceValues(forKeys: [.volumeURLKey]).volume {
+                return volume.path
+            }
+            let parent = probe.deletingLastPathComponent()
+            guard parent.path != probe.path else { return nil }
+            probe = parent
+        }
     }
 
     // MARK: - In-place rename

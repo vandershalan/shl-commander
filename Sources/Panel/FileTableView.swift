@@ -28,6 +28,9 @@ struct FileTableView: NSViewRepresentable {
     let onActivate: () -> Void
     let onRename: (Int, String) -> Void
     let onKeyDown: (NSEvent) -> Bool
+    let dragSources: (Int) -> [URL]
+    let dropDestination: (Int?) -> URL?
+    let onDrop: (_ urls: [URL], _ destination: URL, _ copying: Bool) -> Void
 
     func makeCoordinator() -> FileTableController { FileTableController() }
 
@@ -66,6 +69,11 @@ struct FileTableView: NSViewRepresentable {
         table.target = context.coordinator
         table.doubleAction = #selector(FileTableController.handleDoubleClick(_:))
 
+        // Files in, files out: the other pane, the Finder, and any app that takes file URLs.
+        table.registerForDraggedTypes([.fileURL])
+        table.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
+        table.setDraggingSourceOperationMask([.copy, .move], forLocal: false)
+
         let scroll = NSScrollView()
         scroll.documentView = table
         scroll.hasVerticalScroller = true
@@ -89,6 +97,9 @@ struct FileTableView: NSViewRepresentable {
         controller.onOpen = onOpen
         controller.onSort = onSort
         controller.onRename = onRename
+        controller.dragSources = dragSources
+        controller.dropDestination = dropDestination
+        controller.onDrop = onDrop
         table.keyHandler = onKeyDown
         table.onMove = onMove
         table.onBecomeFirstResponder = onActivate

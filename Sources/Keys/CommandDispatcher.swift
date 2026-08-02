@@ -232,6 +232,54 @@ struct CommandDispatcher {
         }
     }
 
+    /// Files dropped on a pane. Confirmed through the same dialog `F5` and `F6` use — the
+    /// destination is prefilled and editable, so a drop that landed on the wrong folder can be
+    /// corrected instead of undone.
+    func acceptDrop(_ urls: [URL], onto destination: URL, copying: Bool) {
+        guard !urls.isEmpty, !state.operations.isRunning else { return }
+        let kind: FileOperationKind = copying ? .copy : .move
+
+        // Moving something into the folder it already sits in is not an operation; copying
+        // there is, and the conflict dialog is what handles the collision.
+        let sources =
+            kind == .move
+            ? urls.filter {
+                $0.deletingLastPathComponent().standardizedFileURL
+                    != destination.standardizedFileURL
+            }
+            : urls
+        guard !sources.isEmpty else { return }
+
+        let summary = sources.count == 1
+            ? "\u{22}\(sources[0].lastPathComponent)\u{22}"
+            : "\(sources.count) items"
+
+        Task { [state] in
+            guard
+                let typed = await state.operationSheet.confirm(
+                    OperationSheetModel.Confirmation(
+                        title: "\(kind.title) \(summary)",
+                        detail: "Dropped on \(destination.lastPathComponent)",
+                        paths: sources.map(\.path),
+                        confirmTitle: kind.title,
+                        destination: destination.path
+                    )
+                ),
+                let resolved = resolveDestination(typed)
+            else { return }
+
+            state.operationSheet.showRunning()
+            state.operations.start(
+                FileOperationRequest(
+                    kind: kind,
+                    sources: sources,
+                    destinationDirectory: resolved
+                ),
+                prompt: SheetConflictPrompt(model: state.operationSheet)
+            )
+        }
+    }
+
     /// Turns typed text into a usable destination directory, creating it when needed.
     private func resolveDestination(_ typed: String) -> URL? {
         let expanded = (typed as NSString).expandingTildeInPath

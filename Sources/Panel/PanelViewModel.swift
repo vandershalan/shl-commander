@@ -207,6 +207,37 @@ final class PanelViewModel: Identifiable {
 
     func isMarked(_ entry: FileEntry) -> Bool { marks.contains(entry.url) }
 
+    // MARK: - Drag and drop
+
+    /// What a drag beginning on `row` should carry.
+    ///
+    /// Dragging a marked row takes every marked row with it, which is the same rule the file
+    /// commands use; dragging an unmarked one takes only that row, so a drag never picks up
+    /// marks the user had forgotten about somewhere off screen.
+    ///
+    /// Empty for rows that are not files on disk: "..", and anything inside an archive, which
+    /// has no path a receiving app could open.
+    func dragSources(at row: Int) -> [URL] {
+        guard entries.indices.contains(row) else { return [] }
+        let entry = entries[row]
+        guard !entry.isParent, !entry.isArchiveMember else { return [] }
+        guard marks.contains(entry.url) else { return [entry.url] }
+        return markedEntries.filter { !$0.isParent && !$0.isArchiveMember }.map(\.url)
+    }
+
+    /// Where a drop over `row` should land: that row's folder, or the pane's own directory when
+    /// the drop was over a file or over empty space. Nil when this pane cannot take a drop.
+    ///
+    /// ".." is a destination like any other — dropping onto it moves a file up a level, which
+    /// is how the Finder's own list view behaves.
+    func dropDestination(row: Int?) -> URL? {
+        guard !isInsideArchive else { return nil }
+        guard let row, entries.indices.contains(row) else { return directory }
+        let entry = entries[row]
+        guard entry.isDirectory, !entry.isArchiveMember else { return directory }
+        return entry.url
+    }
+
     // MARK: - Navigation
 
     /// Enters `url`. The cursor lands on `selecting` when given, otherwise on the first row.
