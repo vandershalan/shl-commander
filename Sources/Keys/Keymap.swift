@@ -77,6 +77,8 @@ extension Keymap {
         .historyBack: [chord("opt+left"), chord("cmd+leftbracket")],
         .historyForward: [chord("opt+right"), chord("cmd+rightbracket")],
         .refresh: [chord("f2"), chord("ctrl+r"), chord("cmd+r")],
+        // ⌘K is what the Finder uses for the same dialog.
+        .connectToServer: [chord("cmd+k")],
 
         // ⌘⌥1-4 mirror the column order, so sorting stays reachable when F-keys are still
         // wired to brightness and media.

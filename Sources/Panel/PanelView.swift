@@ -5,7 +5,10 @@ import SwiftUI
 struct PanelView: View {
     let panel: PanelViewModel
     let volumes: VolumeService
+    let cloud: CloudService
     let isActive: Bool
+    /// Opens the Connect to Server window, which belongs to no one pane.
+    let onConnectToServer: () -> Void
     let onActivate: () -> Void
     /// Every key press goes to `KeyRouter`; the panel itself binds nothing.
     let onKeyDown: (NSEvent) -> Bool
@@ -101,7 +104,8 @@ struct PanelView: View {
         .background(isActive ? Color.accentColor.opacity(0.18) : Color.clear)
     }
 
-    /// Total Commander's drive buttons, condensed into one menu per pane.
+    /// Total Commander's drive buttons, condensed into one menu per pane — plus the places
+    /// that are not volumes at all: cloud folders, and servers waiting to be mounted.
     private var volumePicker: some View {
         Menu {
             ForEach(volumes.volumes) { volume in
@@ -114,6 +118,33 @@ struct PanelView: View {
                     )
                 }
             }
+
+            // Each provider gets its own submenu: one OneDrive install can hold a personal
+            // account and several shared libraries, which flattened would swamp the volumes.
+            if !cloud.places.isEmpty {
+                Divider()
+                ForEach(cloud.byProvider, id: \.provider) { group in
+                    if group.places.count == 1, let place = group.places.first {
+                        Button(place.provider) {
+                            onActivate()
+                            panel.navigate(to: place.url)
+                        }
+                    } else {
+                        Menu(group.provider) {
+                            ForEach(group.places) { place in
+                                Button(place.title) {
+                                    onActivate()
+                                    panel.navigate(to: place.url)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Divider()
+            Button("Connect to Server… (\u{2318}K)", action: onConnectToServer)
+
             let ejectable = volumes.volumes.filter(\.canEject)
             if !ejectable.isEmpty {
                 Divider()

@@ -65,6 +65,10 @@ struct CommandDispatcher {
             panel.historyForward()
         case .refresh:
             panel.reload()
+        case .connectToServer:
+            ConnectServerWindow.show { [state] mountPoint in
+                state.activePanel.navigate(to: mountPoint)
+            }
 
         // Display
         case .sortByName:

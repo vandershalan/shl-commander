@@ -28,6 +28,10 @@ targets:
         excludes:
           - Info.plist
           - ShlCommander.entitlements
+    dependencies:
+      # Mounting network shares (Connect to Server) goes through NetFS, the same
+      # framework behind the Finder's own dialog.
+      - sdk: NetFS.framework
     settings:
       base:
         PRODUCT_NAME: shl-commander

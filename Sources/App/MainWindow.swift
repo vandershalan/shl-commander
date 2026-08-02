@@ -107,7 +107,9 @@ struct MainWindow: View {
                 PanelView(
                     panel: state.left,
                     volumes: state.volumes,
+                    cloud: state.cloud,
                     isActive: state.active == .left,
+                    onConnectToServer: { connectToServer() },
                     onActivate: { state.active = .left },
                     onKeyDown: router.handle
                 )
@@ -118,13 +120,19 @@ struct MainWindow: View {
                 PanelView(
                     panel: state.right,
                     volumes: state.volumes,
+                    cloud: state.cloud,
                     isActive: state.active == .right,
+                    onConnectToServer: { connectToServer() },
                     onActivate: { state.active = .right },
                     onKeyDown: router.handle
                 )
                 .frame(maxWidth: .infinity)
             }
         }
+    }
+
+    private func connectToServer() {
+        CommandDispatcher(state: state).perform(.connectToServer)
     }
 
     private func clampedLeftWidth(in available: CGFloat) -> CGFloat {

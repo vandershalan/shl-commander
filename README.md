@@ -25,6 +25,9 @@ cursor that never wanders, marks kept separate from the cursor, and a command fo
 - **Session restore**: tabs, paths, sort, and focus come back on relaunch.
 - **Zoom** on the standard Mac keys (`⌘+`, `⌘-`, `⌘0`). Rows, fonts, icons and columns scale
   together, and the setting survives a relaunch.
+- **Cloud folders and network shares.** OneDrive, iCloud Drive, Google Drive and anything else
+  with a File Provider are listed beside the volumes; `⌘K` mounts SMB (and AFP, NFS, FTP,
+  WebDAV) shares and remembers them.
 - Quick Look (`F3`), an internal text/hex viewer, Open in Terminal, Reveal in Finder.
 - **A searchable shortcut list** (`F1` or `⌘/`), built from the live keymap, so it cannot fall
   out of step with what the keys actually do.
@@ -140,6 +143,7 @@ setting. Holding `fn` works too.
 | Volume root | `⌃\` | |
 | Back / Forward | `⌥←` / `⌥→` | `⌘[` / `⌘]` |
 | Refresh | `F2`, `⌃R` | `⌘R` |
+| Connect to Server | | `⌘K` |
 | Sort by name / ext / date / size | `⌃F3` / `⌃F4` / `⌃F5` / `⌃F6` | `⌘⌥1`–`⌘⌥4` |
 | Show hidden files | `⌃H` | `⌘⇧.` |
 | Zoom in / out | | `⌘+` / `⌘-` |
@@ -161,7 +165,9 @@ hidden files, and a button that opens the shortcut list. Sorting is also availab
 a column header.
 
 Typing any printable character starts a quick filter, shown in a bar at the foot of the pane
-with a live match count. `Backspace` edits that filter for as long as the bar is showing —
+with a live match count. The cursor follows the filter onto the first match as you type, so
+narrowing to a single row leaves `Return` one keystroke from opening it. `Backspace` edits that
+filter for as long as the bar is showing —
 including once the text is empty — so clearing a filter never walks you out of the directory.
 `Esc` closes the bar, and only then does `Backspace` mean "enclosing folder" again.
 
@@ -219,6 +225,34 @@ Reading is done by `/usr/bin/tar`, which on macOS is bsdtar over libarchive, and
 those tools installed (Homebrew); the app says which one is missing rather than failing
 obscurely.
 
+### Cloud folders and network shares
+
+The volume button at the top of each pane lists more than disks. Under the volumes come the
+cloud folders macOS keeps under `~/Library/CloudStorage` — OneDrive, Google Drive, Dropbox, Box,
+and anything else that ships a File Provider — plus iCloud Drive. A provider with several roots
+(a personal OneDrive and its shared libraries, say) gets a submenu. Nothing here talks to a
+cloud API: these are ordinary folders that the provider's own daemon keeps in sync, so copying
+into one is a copy, and the sync happens afterwards. Accounts added or removed while the app is
+running appear and disappear on their own.
+
+`⌘K` opens **Connect to Server**, which mounts through NetFS — the same machinery behind the
+Finder's dialog, so the same addresses work:
+
+```
+smb://nas.local/media          a share on a NAS or a Windows box
+//192.168.0.5/Backup           the Windows spelling; SMB is assumed
+nas.local/media                so is a bare host
+afp://mac.local/Files          AFP, NFS, FTP and WebDAV (dav://) all mount too
+```
+
+The share is required — `smb://host` on its own has nothing to mount. Leave the name and
+password empty for a guest share. On success the active pane opens the mount point, and the
+address is saved; tick *Remember the password in the Keychain* and the next connection needs
+one keystroke. Passwords are internet-password entries in the login Keychain, visible and
+revocable in Keychain Access — the saved-server file itself holds only the address and the
+name. Reconnecting to a share that is still mounted takes you to it rather than mounting it a
+second time, and mounted shares eject from the same menu as any other volume.
+
 ### Rebinding
 
 **Settings → Keyboard** (`⌘,`) lists every command with its keys. Select one, press *Record
@@ -259,9 +293,10 @@ A malformed entry is skipped rather than guessed at.
 
 ## Where things are kept
 
-`~/Library/Application Support/shl-commander/` holds `favorites.json`, `keymap.json`, and
-`session.json`. Delete any of them to go back to defaults; the app writes the session on quit
-and rereads it at launch.
+`~/Library/Application Support/shl-commander/` holds `favorites.json`, `keymap.json`,
+`servers.json`, and `session.json`. Delete any of them to go back to defaults; the app writes
+the session on quit and rereads it at launch. Server passwords are not in that folder — they
+are internet-password entries in the login Keychain, removed with the server that owns them.
 
 ## Layout
 

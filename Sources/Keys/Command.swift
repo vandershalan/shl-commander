@@ -31,6 +31,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
     case historyBack
     case historyForward
     case refresh
+    case connectToServer
 
     // Display
     case sortByName
@@ -106,6 +107,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .historyBack: return "Back"
         case .historyForward: return "Forward"
         case .refresh: return "Refresh"
+        case .connectToServer: return "Connect to Server…"
         case .sortByName: return "Sort by Name"
         case .sortByExtension: return "Sort by Extension"
         case .sortByDate: return "Sort by Date"
@@ -146,7 +148,8 @@ enum Command: String, CaseIterable, Codable, Sendable {
     /// Which menu the command appears under.
     var section: Section {
         switch self {
-        case .switchPane, .openCursor, .goUp, .goToVolumeRoot, .historyBack, .historyForward:
+        case .switchPane, .openCursor, .goUp, .goToVolumeRoot, .historyBack, .historyForward,
+            .connectToServer:
             return .go
         case .refresh, .sortByName, .sortByExtension, .sortByDate, .sortBySize, .toggleHidden,
             .clearFilter, .measureSelectedDirectories, .measureAllDirectories,

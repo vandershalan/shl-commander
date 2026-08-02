@@ -31,6 +31,9 @@ final class AppState {
     /// Shared so a mount or unmount updates both panes' volume pickers at once.
     let volumes = VolumeService()
 
+    /// OneDrive, iCloud Drive and friends: ordinary folders, listed beside the volumes.
+    let cloud = CloudService()
+
     let favorites = FavoritesStore()
 
     /// Outlives the pop-up favourites menu, which needs an NSObject target.
