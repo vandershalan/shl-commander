@@ -37,6 +37,9 @@ cursor that never wanders, marks kept separate from the cursor, and a command fo
 - Quick Look (`F3`), an internal text/hex viewer, Open in Terminal, Reveal in Finder.
 - **A searchable shortcut list** (`F1` or `⌘/`), built from the live keymap, so it cannot fall
   out of step with what the keys actually do.
+- **Pack and unpack** (`⌥F5` / `⌥F9`): zip, tar, tar.gz, tar.bz2, tar.xz and tar.zst out of the
+  same bsdtar the reader uses, with the archive's name choosing the format.
+- **Get Info** (`⌘I`) with size on disk, recursive totals, dates, owner and POSIX mode.
 - **Browse inside archives.** `Return` on a `.zip`, `.tar.gz`, `.7z` and friends opens it like a
   folder: navigate down, filter, mark, preview with Quick Look, and copy files out. Folders
   inside an archive show their real recursive size straight away, since the archive already
@@ -136,6 +139,9 @@ setting. Holding `fn` works too.
 | Rename in place | `⇧F6` | `⌘Return` |
 | Move to Trash | `F8` | `⌘⌫` |
 | Delete permanently | `⇧F8` | `⌘⇧⌫` |
+| Pack | `⌥F5` | `⌘⇧P` |
+| Unpack | `⌥F9` | `⌘⇧U` |
+| Get Info | `⌥Return` | `⌘I` |
 | Measure selected / all folders | `⌃L` / `⌥⇧Return` | `⌘L` / `⌘⇧L` |
 | New tab / close tab | `⌃T` / `⌃W` | `⌘T` / `⌘W` |
 | Next / previous tab | `⌃Tab` / `⌃⇧Tab` | `⌘⇧]` / `⌘⇧[` |
@@ -210,6 +216,27 @@ viewer all behave normally. Nested archives open in turn.
 inside it, and resolves name clashes with the same dialog a normal copy uses. Previewing or
 opening a member extracts a scratch copy under the system temporary directory, which is removed
 on quit.
+
+### Packing
+
+`⌥F5` (or `⌘⇧P`) packs the selection. The dialog asks for the archive's full path, prefilled
+with a name in the other pane — the item's own name for one item, the folder's name for several.
+**The suffix picks the format:** `.zip`, `.tar`, `.tar.gz`, `.tar.bz2`, `.tar.xz`, `.tar.zst`. A
+name with no recognised suffix gets `.zip`, and a path naming an existing folder gets the
+suggested file name appended. An existing archive is never overwritten — pick another name.
+
+Paths inside are relative to the pane's folder, so a packed `src` unpacks as `src`, not as a
+tower of empty parent directories. A pack that fails leaves no half-written file behind.
+
+Writing goes through the same bsdtar that reads, so there is one dependency and no vendored
+library. bsdtar compresses gzip, bzip2 and xz itself; only `.tar.zst` needs a separate `zstd`
+binary, and it is offered only when one is installed (Homebrew's prefixes are searched, since an
+app launched from the Finder inherits no shell `PATH`).
+
+`⌥F9` (or `⌘⇧U`) unpacks the archives under the cursor — or every marked archive, one after
+another — into the other pane, without entering them first. Name clashes ask the same question a
+copy does. To take only part of an archive, enter it with `Return` and use `F5` on the rows you
+want.
 
 **Archives are read-only.** Creating, renaming, moving and deleting inside one are refused with
 a message rather than half-done, and edits to an opened member are not written back. Copy the
@@ -296,6 +323,18 @@ one keystroke. Passwords are internet-password entries in the login Keychain, vi
 revocable in Keychain Access — the saved-server file itself holds only the address and the
 name. Reconnecting to a share that is still mounted takes you to it rather than mounting it a
 second time, and mounted shares eject from the same menu as any other volume.
+
+### Get Info
+
+`⌘I` (or `⌥Return`, Total Commander's properties key) opens an info window for the selection, or
+for the pane's own folder when nothing is selected. One window per selection, so two files can
+be compared side by side.
+
+It reports size and size on disk with the exact byte count — the difference is what tells you a
+file is sparse or a folder is full of tiny ones — plus kind, uniform type identifier, where it
+lives, created/modified/last-opened dates, owner and group, permissions as `drwxr-xr-x  (755)`,
+the symlink target where there is one, and the volume. Folders and multi-item selections are
+measured recursively in the background, with files and folders counted separately.
 
 ### Rebinding
 

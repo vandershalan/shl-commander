@@ -223,6 +223,158 @@ final class FileOperationQueue {
         await setCurrent(item: "", itemsDone: members.count)
     }
 
+    // MARK: - Packing and unpacking
+
+    /// Writes the selection into a new archive.
+    ///
+    /// Progress is item-based only: bsdtar reports nothing as it goes, and inventing a byte
+    /// total that the bar could not follow would be worse than an indeterminate one.
+    func startPacking(
+        _ sources: [FileEntry],
+        into archive: URL,
+        format: ArchiveWriter.Format,
+        from directory: URL
+    ) {
+        guard task == nil, !sources.isEmpty else { return }
+
+        failures = []
+        progress = Progress(
+            title: "Packing",
+            currentItem: archive.lastPathComponent,
+            itemsTotal: sources.count,
+            isScanning: false
+        )
+
+        let names = sources.map(\.name)
+        task = Task.detached(priority: .userInitiated) { [weak self] in
+            do {
+                try ArchiveWriter.create(
+                    archive: archive,
+                    from: names,
+                    in: directory,
+                    format: format,
+                    isCancelled: { Task.isCancelled }
+                )
+            } catch {
+                await self?.record(
+                    OperationFailure(url: archive, message: error.localizedDescription))
+            }
+            await self?.setCurrent(item: "", itemsDone: names.count)
+            await self?.finish()
+        }
+    }
+
+    /// Unpacks a whole archive into `destination`, from outside it.
+    ///
+    /// Staged and then moved into place exactly as a member extraction is, so name clashes ask
+    /// the same question and a cancelled run leaves nothing half-written behind.
+    func startUnpacking(
+        _ archives: [URL],
+        to destination: URL,
+        prompt: any ConflictPrompting
+    ) {
+        guard task == nil, !archives.isEmpty else { return }
+
+        failures = []
+        progress = Progress(
+            title: "Unpacking",
+            currentItem: archives[0].lastPathComponent,
+            itemsTotal: archives.count,
+            isScanning: false
+        )
+
+        task = Task.detached(priority: .userInitiated) { [weak self] in
+            // Serially: two bsdtars writing into one directory would race over the same names.
+            for archive in archives {
+                if Task.isCancelled { break }
+                await self?.setCurrent(item: archive.lastPathComponent, itemsDone: 0)
+                await self?.unpack(archive, to: destination, prompt: prompt)
+            }
+            await self?.finish()
+        }
+    }
+
+    private nonisolated func unpack(
+        _ archive: URL,
+        to destination: URL,
+        prompt: any ConflictPrompting
+    ) async {
+        let fileManager = FileManager.default
+        let staging = destination.appendingPathComponent(
+            ".shl-unpack-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fileManager.removeItem(at: staging) }
+
+        do {
+            try ArchiveReader.extractAll(
+                from: archive, to: staging, isCancelled: { Task.isCancelled })
+        } catch {
+            await record(OperationFailure(url: archive, message: error.localizedDescription))
+            return
+        }
+
+        // Only the top level moves; whatever is beneath it travels with its folder.
+        let staged =
+            (try? fileManager.contentsOfDirectory(atPath: staging.path))?.sorted() ?? []
+        await setTotals(bytes: 0, items: staged.count)
+        await moveStaged(staged, from: staging, to: destination, prompt: prompt)
+    }
+
+    /// Moves extracted items out of a staging directory, asking about each clash.
+    private nonisolated func moveStaged(
+        _ names: [String],
+        from staging: URL,
+        to destination: URL,
+        prompt: any ConflictPrompting
+    ) async {
+        let fileManager = FileManager.default
+        let exists: (URL) -> Bool = { fileManager.fileExists(atPath: $0.path) }
+        let modified: (URL) -> Date? = {
+            try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        }
+        var standingResolution: ConflictResolution?
+
+        for (index, name) in names.enumerated() {
+            if Task.isCancelled { break }
+            await setCurrent(item: name, itemsDone: index)
+
+            let source = staging.appendingPathComponent(name)
+            let target = destination.appendingPathComponent(name)
+
+            var resolution = ConflictResolution.rename
+            if exists(target) {
+                if let standingResolution {
+                    resolution = standingResolution
+                } else {
+                    guard
+                        let decision = await prompt.resolveConflict(
+                            kind: .copy, source: source, destination: target)
+                    else { break }
+                    if decision.applyToAll { standingResolution = decision.resolution }
+                    resolution = decision.resolution
+                }
+            }
+
+            let plan = ConflictResolver.plan(
+                source: source, destination: target, resolution: resolution,
+                exists: exists, modified: modified
+            )
+            do {
+                switch plan {
+                case .skip:
+                    break
+                case .overwrite(let url):
+                    try fileManager.removeItem(at: url)
+                    try moveIntoPlace(from: source, to: url)
+                case .write(let url):
+                    try moveIntoPlace(from: source, to: url)
+                }
+            } catch {
+                await record(OperationFailure(url: target, message: error.localizedDescription))
+            }
+        }
+        await setCurrent(item: "", itemsDone: names.count)
+    }
+
     /// Creates any missing parent directories, then renames the staged item into place.
     private nonisolated func moveIntoPlace(from source: URL, to target: URL) throws {
         try FileManager.default.createDirectory(

@@ -69,6 +69,10 @@ extension Keymap {
         // ⌘⌫ is what the Finder uses, so the muscle memory transfers either way.
         .moveToTrash: [chord("f8"), chord("cmd+backspace")],
         .deletePermanently: [chord("shift+f8"), chord("cmd+shift+backspace")],
+        // Total Commander packs with ⌥F5 and unpacks with ⌥F9; ⌘I is the Finder's info panel.
+        .createArchive: [chord("opt+f5"), chord("cmd+shift+p")],
+        .unpackArchive: [chord("opt+f9"), chord("cmd+shift+u")],
+        .getInfo: [chord("opt+return"), chord("cmd+i")],
 
         .switchPane: [chord("tab")],
         .openCursor: [chord("return"), chord("keypadenter")],

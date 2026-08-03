@@ -44,6 +44,9 @@ enum RowContextMenu {
         }
 
         menu.addItem(.separator())
+        add(.getInfo, to: menu, panel: panel, targets: targets, state: state)
+
+        menu.addItem(.separator())
         add(.copyToOtherPane, to: menu, panel: panel, targets: targets, state: state)
         add(.moveToOtherPane, to: menu, panel: panel, targets: targets, state: state)
         add(.duplicate, to: menu, panel: panel, targets: targets, state: state)
@@ -52,6 +55,13 @@ enum RowContextMenu {
         }
         add(.moveToTrash, to: menu, panel: panel, targets: targets, state: state)
         add(.deletePermanently, to: menu, panel: panel, targets: targets, state: state)
+
+        menu.addItem(.separator())
+        add(.createArchive, to: menu, panel: panel, targets: targets, state: state)
+        if targets.contains(where: { !$0.isArchiveMember && !$0.isDirectory && $0.isBrowsableArchive })
+        {
+            add(.unpackArchive, to: menu, panel: panel, targets: targets, state: state)
+        }
 
         menu.addItem(.separator())
         if let folder = single, folder.isDirectory, !folder.isArchiveMember {
@@ -97,6 +107,7 @@ enum RowContextMenu {
         add(.revealInFinder, to: menu, panel: panel, targets: [], state: state)
 
         menu.addItem(.separator())
+        add(.getInfo, to: menu, panel: panel, targets: [], state: state)
         add(.addFavorite, to: menu, panel: panel, targets: [], state: state)
         add(.measureAllDirectories, to: menu, panel: panel, targets: [], state: state)
         add(.refresh, to: menu, panel: panel, targets: [], state: state)

@@ -255,6 +255,7 @@ enum ArchiveReader {
         let process = Process()
         process.executableURL = tool
         process.arguments = flags + [archive.path]
+        process.environment = ToolPath.environment()
         process.standardOutput = output
         process.standardError = errors
 
@@ -307,6 +308,28 @@ enum ArchiveReader {
         _ = try run(["-xf", archive.path, "-C", directory.path] + safe)
     }
 
+    /// Extracts an archive whole, without listing it first.
+    ///
+    /// This is what unpacking an archive from the outside means: bsdtar with no member list
+    /// takes everything, and the names inside stay as the archive recorded them.
+    static func extractAll(
+        from archive: URL,
+        to directory: URL,
+        isCancelled: () -> Bool = { false }
+    ) throws {
+        guard let format = ArchiveProbe.format(of: archive) else {
+            throw Failure.unsupported(archive.lastPathComponent)
+        }
+        if format.isSingleStream {
+            try extractStream(
+                from: archive, format: format, to: directory, isCancelled: isCancelled)
+            return
+        }
+        if isCancelled() { throw Failure.cancelled }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        _ = try run(["-xf", archive.path, "-C", directory.path])
+    }
+
     /// Extracts one member and returns where it landed.
     static func extractOne(
         member: String,
@@ -323,10 +346,10 @@ enum ArchiveReader {
         let process = Process()
         process.executableURL = tool
         process.arguments = arguments
-        // The listing parser depends on English month names and the C column layout.
-        var environment = ProcessInfo.processInfo.environment
-        environment["LC_ALL"] = "C"
-        process.environment = environment
+        // The listing parser depends on English month names and the C column layout. The path
+        // matters too: bsdtar shells out to `zstd` for a .tar.zst, and the app inherits no
+        // login shell PATH to find it on.
+        process.environment = ToolPath.environment(adding: ["LC_ALL": "C"])
 
         let output = Pipe()
         let errors = Pipe()

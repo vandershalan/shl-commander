@@ -22,6 +22,9 @@ enum Command: String, CaseIterable, Codable, Sendable {
     case renameInPlace
     case moveToTrash
     case deletePermanently
+    case createArchive
+    case unpackArchive
+    case getInfo
 
     // Navigation
     case switchPane
@@ -100,6 +103,9 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .renameInPlace: return "Rename"
         case .moveToTrash: return "Move to Trash"
         case .deletePermanently: return "Delete Permanently…"
+        case .createArchive: return "Pack…"
+        case .unpackArchive: return "Unpack…"
+        case .getInfo: return "Get Info"
         case .switchPane: return "Switch Pane"
         case .openCursor: return "Open"
         case .goUp: return "Enclosing Folder"
@@ -169,7 +175,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .quickLook, .viewInternal, .editFile,
             .newFolder, .newFile, .copyToOtherPane, .moveToOtherPane, .duplicate,
             .renameInPlace, .moveToTrash, .deletePermanently, .openInTerminal, .revealInFinder,
-            .copyPathToClipboard:
+            .copyPathToClipboard, .createArchive, .unpackArchive, .getInfo:
             return .file
         }
     }

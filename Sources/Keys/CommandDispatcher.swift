@@ -49,6 +49,12 @@ struct CommandDispatcher {
             delete(on: panel, toTrash: true)
         case .deletePermanently:
             delete(on: panel, toTrash: false)
+        case .createArchive:
+            pack(on: panel)
+        case .unpackArchive:
+            unpack(on: panel)
+        case .getInfo:
+            InfoWindow.show(for: panel.actionTargets, in: panel.directory)
 
         // Navigation
         case .switchPane:
@@ -175,6 +181,11 @@ struct CommandDispatcher {
         case .historyForward: return panel.canGoForward
         case .clearFilter: return panel.isFiltering
         case .markNone, .invertMarks: return !panel.entries.isEmpty
+        case .createArchive: return !panel.actionTargets.isEmpty && !panel.isInsideArchive
+        case .unpackArchive:
+            return panel.actionTargets.contains {
+                !$0.isArchiveMember && !$0.isDirectory && $0.isBrowsableArchive
+            }
         case .goUp: return DirectoryLister.parent(of: panel.directory) != nil
         default: return true
         }
@@ -300,6 +311,139 @@ struct CommandDispatcher {
         } catch {
             report([OperationFailure(url: url, message: error.localizedDescription)])
             return nil
+        }
+    }
+
+    // MARK: - Packing
+
+    /// Asks for an archive name, then writes the selection into it.
+    ///
+    /// The name is what picks the format: type `stuff.tar.gz` and that is what comes out. It
+    /// beats a separate format menu, because the name has to be typed anyway and the suffix is
+    /// what anyone receiving the archive will judge it by.
+    private func pack(on panel: PanelViewModel) {
+        let targets = panel.actionTargets
+        guard !targets.isEmpty, !state.operations.isRunning else { return }
+        guard !panel.isInsideArchive else {
+            // Members have no path on disk to hand to the packer; F5 copies them out first.
+            refuseArchiveWrite()
+            return
+        }
+
+        let summary = targets.count == 1
+            ? "\u{22}\(targets[0].name)\u{22}"
+            : "\(targets.count) items"
+        let suggestion = ArchiveWriter.suggestedName(
+            for: targets.map(\.url), in: panel.directory, format: .default)
+        // The other pane is where a packed archive usually belongs — the same default F5 uses.
+        let proposed = state.inactivePanel.directory.appendingPathComponent(suggestion).path
+
+        Task { [state] in
+            guard
+                let typed = await state.operationSheet.confirm(
+                    OperationSheetModel.Confirmation(
+                        title: "Pack \(summary)",
+                        detail: "The suffix picks the format: "
+                            + ArchiveWriter.writableFormats.map { "." + $0.rawValueSuffix }
+                                .joined(separator: ", ") + ".",
+                        paths: targets.map(\.url.path),
+                        confirmTitle: "Pack",
+                        destination: proposed,
+                        fieldLabel: "Archive"
+                    )
+                ),
+                let archive = resolveArchivePath(typed, suggestedName: suggestion)
+            else { return }
+
+            state.operationSheet.showRunning()
+            state.operations.startPacking(
+                targets,
+                into: archive.url,
+                format: archive.format,
+                from: panel.directory
+            )
+        }
+    }
+
+    /// Turns the typed text into an archive path and the format its name asks for.
+    ///
+    /// A path naming a folder gets the suggested file name appended, and a name with no known
+    /// suffix gets `.zip` — otherwise a typo would produce a file nothing can open.
+    private func resolveArchivePath(
+        _ typed: String,
+        suggestedName: String
+    ) -> (url: URL, format: ArchiveWriter.Format)? {
+        let expanded = (typed as NSString).expandingTildeInPath
+            .trimmingCharacters(in: .whitespaces)
+        guard !expanded.isEmpty else { return nil }
+        var url = URL(fileURLWithPath: expanded).standardizedFileURL
+
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+            isDirectory.boolValue
+        {
+            url = url.appendingPathComponent(suggestedName)
+        }
+
+        var format = ArchiveWriter.Format.matching(name: url.lastPathComponent)
+        if format == nil {
+            format = .default
+            url = url.appendingPathExtension("zip")
+        }
+
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        } catch {
+            report([
+                OperationFailure(
+                    url: url.deletingLastPathComponent(), message: error.localizedDescription)
+            ])
+            return nil
+        }
+        return (url, format ?? .default)
+    }
+
+    /// Unpacks the selected archives into the other pane, without entering them first.
+    private func unpack(on panel: PanelViewModel) {
+        let archives = panel.actionTargets.filter {
+            !$0.isArchiveMember && !$0.isDirectory && $0.isBrowsableArchive
+        }
+        guard !state.operations.isRunning else { return }
+        guard !archives.isEmpty else {
+            report([
+                OperationFailure(
+                    url: panel.cursorEntry?.url ?? panel.directory,
+                    message: "Not an archive this app can unpack."
+                )
+            ])
+            return
+        }
+
+        let summary = archives.count == 1
+            ? "\u{22}\(archives[0].name)\u{22}"
+            : "\(archives.count) archives"
+
+        Task { [state] in
+            guard
+                let typed = await state.operationSheet.confirm(
+                    OperationSheetModel.Confirmation(
+                        title: "Unpack \(summary)",
+                        detail: "Everything inside goes into the destination folder.",
+                        paths: archives.map(\.url.path),
+                        confirmTitle: "Unpack",
+                        destination: state.inactivePanel.directory.path
+                    )
+                ),
+                let destination = resolveDestination(typed)
+            else { return }
+
+            state.operationSheet.showRunning()
+            state.operations.startUnpacking(
+                archives.map(\.url),
+                to: destination,
+                prompt: SheetConflictPrompt(model: state.operationSheet)
+            )
         }
     }
 
