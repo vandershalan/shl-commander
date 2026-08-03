@@ -17,6 +17,26 @@ extension KeyChord {
         Self.keyEquivalents[keyCode]
     }
 
+    /// The same thing for AppKit, which takes the key as a string rather than as a type.
+    ///
+    /// Used by the right-click menus, which are built as `NSMenu` because they are opened from
+    /// an `NSTableView` rather than from a SwiftUI hierarchy.
+    var keyEquivalentString: String? {
+        switch keyCode {
+        case 36: return "\r"
+        case 48: return "\t"
+        case 49: return " "
+        case 51: return String(UnicodeScalar(NSBackspaceCharacter)!)
+        case 53: return "\u{1b}"
+        default:
+            guard let equivalent = Self.keyEquivalents[keyCode] else { return nil }
+            let character = equivalent.character
+            // Arrows and the like have no printable form a menu could take.
+            return character.isLetter || character.isNumber || character.isPunctuation
+                || character.isSymbol ? String(character) : nil
+        }
+    }
+
     private static let keyEquivalents: [UInt16: KeyEquivalent] = [
         0: "a", 1: "s", 2: "d", 3: "f", 4: "h", 5: "g", 6: "z", 7: "x", 8: "c", 9: "v",
         11: "b", 12: "q", 13: "w", 14: "e", 15: "r", 16: "y", 17: "t", 31: "o", 32: "u",

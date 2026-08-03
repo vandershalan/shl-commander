@@ -11,6 +11,8 @@ struct PanelView: View {
     let onConnectToServer: () -> Void
     /// Files dropped on this pane, and where they should land.
     let onDrop: (_ urls: [URL], _ destination: URL, _ copying: Bool) -> Void
+    /// Builds this pane's right-click menu; nil row means the folder itself.
+    let onContextMenu: (Int?) -> NSMenu?
     let onActivate: () -> Void
     /// Every key press goes to `KeyRouter`; the panel itself binds nothing.
     let onKeyDown: (NSEvent) -> Bool
@@ -58,6 +60,13 @@ struct PanelView: View {
                     }
                 },
                 onKeyDown: onKeyDown,
+                contextMenu: { row in
+                    onActivate()
+                    // The cursor follows the right-click, the way a selection does in the
+                    // Finder: several commands act on the cursor row, not on a target list.
+                    if let row { panel.cursor = row }
+                    return onContextMenu(row)
+                },
                 dragSources: { panel.dragSources(at: $0) },
                 dropDestination: { panel.dropDestination(row: $0) },
                 onDrop: { urls, destination, copying in

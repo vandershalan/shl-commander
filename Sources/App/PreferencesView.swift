@@ -26,6 +26,7 @@ struct PreferencesView: View {
 private struct GeneralPreferences: View {
     let state: AppState
     private var settings: AppSettings { AppSettings.shared }
+    private var openWith: OpenWithStore { .shared }
 
     var body: some View {
         Form {
@@ -60,6 +61,31 @@ private struct GeneralPreferences: View {
                         set: { settings.showHiddenByDefault = $0 }
                     )
                 )
+            }
+
+            Section("Open With") {
+                if openWith.apps.isEmpty {
+                    Text(
+                        "Applications you pick under Open With are remembered here, so a folder can be opened in an editor or a terminal that never claims to handle folders."
+                    )
+                    .foregroundStyle(.secondary)
+                }
+                ForEach(openWith.apps) { app in
+                    LabeledContent(app.name) {
+                        HStack {
+                            Text(app.path)
+                                .lineLimit(1)
+                                .truncationMode(.head)
+                                .foregroundStyle(app.exists ? .secondary : Color.red)
+                            Spacer()
+                            Button("Remove") { openWith.remove(app) }
+                        }
+                    }
+                }
+                Button("Add Application…") {
+                    guard let url = AppOpener.chooseApplication(prompt: "Add") else { return }
+                    openWith.remember(url)
+                }
             }
 
             Section("Editor") {

@@ -28,6 +28,7 @@ struct FileTableView: NSViewRepresentable {
     let onActivate: () -> Void
     let onRename: (Int, String) -> Void
     let onKeyDown: (NSEvent) -> Bool
+    let contextMenu: (Int?) -> NSMenu?
     let dragSources: (Int) -> [URL]
     let dropDestination: (Int?) -> URL?
     let onDrop: (_ urls: [URL], _ destination: URL, _ copying: Bool) -> Void
@@ -100,6 +101,7 @@ struct FileTableView: NSViewRepresentable {
         controller.dragSources = dragSources
         controller.dropDestination = dropDestination
         controller.onDrop = onDrop
+        table.contextMenu = contextMenu
         table.keyHandler = onKeyDown
         table.onMove = onMove
         table.onBecomeFirstResponder = onActivate

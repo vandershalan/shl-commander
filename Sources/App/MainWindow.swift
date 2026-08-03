@@ -111,6 +111,9 @@ struct MainWindow: View {
                     isActive: state.active == .left,
                     onConnectToServer: { connectToServer() },
                     onDrop: accept(drop:to:copying:),
+                    onContextMenu: { row in
+                        RowContextMenu.build(row: row, panel: state.left, state: state)
+                    },
                     onActivate: { state.active = .left },
                     onKeyDown: router.handle
                 )
@@ -125,6 +128,9 @@ struct MainWindow: View {
                     isActive: state.active == .right,
                     onConnectToServer: { connectToServer() },
                     onDrop: accept(drop:to:copying:),
+                    onContextMenu: { row in
+                        RowContextMenu.build(row: row, panel: state.right, state: state)
+                    },
                     onActivate: { state.active = .right },
                     onKeyDown: router.handle
                 )

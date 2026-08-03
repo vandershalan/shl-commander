@@ -199,10 +199,30 @@ final class PanelViewModel: Identifiable {
     /// What a command should act on: the marked rows, or the cursor row when nothing is
     /// marked. This is how every Total Commander file operation picks its targets.
     var actionTargets: [FileEntry] {
+        // A context-menu command acts on what was right-clicked, which is not always what the
+        // marks say — see `contextTargets`.
+        if let contextTargets { return contextTargets }
         let marked = markedEntries
         if !marked.isEmpty { return marked }
         guard let entry = cursorEntry, !entry.isParent else { return [] }
         return [entry]
+    }
+
+    /// Set for the length of one context-menu command, then cleared.
+    ///
+    /// Right-clicking an unmarked row has to act on that row even when marks exist elsewhere —
+    /// possibly scrolled out of sight — and right-clicking a marked one has to act on the whole
+    /// marked set. Neither is what `actionTargets` would otherwise pick, and clearing the marks
+    /// to make it fit would throw away work the user did.
+    var contextTargets: [FileEntry]?
+
+    /// What a right-click on `row` should act on.
+    func contextMenuTargets(at row: Int) -> [FileEntry] {
+        guard entries.indices.contains(row) else { return [] }
+        let entry = entries[row]
+        guard !entry.isParent else { return [] }
+        guard marks.contains(entry.url) else { return [entry] }
+        return markedEntries
     }
 
     func isMarked(_ entry: FileEntry) -> Bool { marks.contains(entry.url) }

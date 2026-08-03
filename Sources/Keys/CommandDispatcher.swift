@@ -159,7 +159,7 @@ struct CommandDispatcher {
 
         // Shell integration
         case .openInTerminal:
-            openInTerminal(panel.directory)
+            openTerminal(at: panel.directory)
         case .revealInFinder:
             revealInFinder(panel)
         case .copyPathToClipboard:
@@ -656,7 +656,7 @@ struct CommandDispatcher {
     }
 
     /// Prefers iTerm when it is installed, since anyone who has it installed wants it.
-    private func openInTerminal(_ directory: URL) {
+    func openTerminal(at directory: URL) {
         let candidates = ["com.googlecode.iterm2", "com.apple.Terminal"]
         let application = candidates.lazy
             .compactMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }

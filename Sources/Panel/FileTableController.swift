@@ -11,6 +11,17 @@ final class FileTable: NSTableView {
     var keyHandler: (NSEvent) -> Bool = { _ in false }
     var onMove: (CursorMove) -> Void = { _ in }
     var onBecomeFirstResponder: () -> Void = {}
+    /// Builds the right-click menu. The row is nil when the click landed below the last row,
+    /// which means the folder itself rather than anything in it.
+    var contextMenu: (Int?) -> NSMenu? = { _ in nil }
+
+    /// Right-clicking builds the menu on the spot rather than keeping one attached, so it can
+    /// name what was actually clicked ("Copy 3 items") and offer only what applies to it.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let point = convert(event.locationInWindow, from: nil)
+        let clicked = row(at: point)
+        return contextMenu(clicked >= 0 ? clicked : nil)
+    }
 
     override var acceptsFirstResponder: Bool { true }
 

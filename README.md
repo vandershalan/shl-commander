@@ -28,6 +28,9 @@ cursor that never wanders, marks kept separate from the cursor, and a command fo
 - **Cloud folders and network shares.** OneDrive, iCloud Drive, Google Drive and anything else
   with a File Provider are listed beside the volumes; `⌘K` mounts SMB (and AFP, NFS, FTP,
   WebDAV) shares and remembers them.
+- **Right-click menu** on rows and on the folder itself, with an **Open With** list that
+  remembers the apps you pick — so a folder can go to Cursor, IntelliJ or iTerm, none of which
+  macOS ever offers for folders.
 - **Drag and drop**, in and out: between the panes, onto a folder row, to and from the Finder
   and any app that takes files. Same volume moves, across volumes copies, `⌥` forces a copy and
   `⌘` a move.
@@ -227,6 +230,27 @@ Reading is done by `/usr/bin/tar`, which on macOS is bsdtar over libarchive, and
 `bzip2` for streams — no third-party archive library is vendored. `xz` and `zstd` streams need
 those tools installed (Homebrew); the app says which one is missing rather than failing
 obscurely.
+
+### Right-click menu and Open With
+
+Right-clicking a row moves the cursor to it and offers what applies to it: Open, Open With,
+Quick Look, the copy/move/rename/delete commands, Reveal in Finder, Copy Path, and Mark. Each
+item carries the command's own `⌘` key, so the menu doubles as a reminder of the keyboard.
+Folders additionally offer *New Terminal at Folder* and *Add to Favourites*; files offer *View as
+Text* and *Edit*. Right-clicking below the last row is about the pane's own folder instead: New
+Folder, New File, Open This Folder With, Open in Terminal, Add to Favourites, Measure All
+Folders, Refresh.
+
+Right-clicking a **marked** row acts on the whole marked set; right-clicking an unmarked one acts
+on that row alone, even when marks exist further up the pane. The marks are never cleared to
+make that work.
+
+**Open With** lists what macOS suggests, then the applications you have picked before, then
+*Other…*. Anything chosen through *Other…* is remembered, which is the point: no editor or
+terminal claims to handle `public.folder`, so macOS offers nothing but the Finder for a folder —
+yet Cursor, IntelliJ, Zed, VS Code and iTerm all open one perfectly well. On first run the list
+is seeded with whichever of those are installed. **Settings → General → Open With** lists what is
+remembered, and removes or adds entries. The list lives in `openwith.json`.
 
 ### Drag and drop
 
