@@ -59,6 +59,7 @@ struct MainWindow: View {
         let dispatcher = CommandDispatcher(state: state)
         // Both panes share the setting, so either one answers for it.
         let showingHidden = state.activePanel.showHidden
+        let grouping = state.settings.directoriesFirst
 
         return HStack(spacing: 8) {
             FavoritesBarView(
@@ -82,6 +83,19 @@ struct MainWindow: View {
                 showingHidden
                     ? "Hide hidden files (\u{2318}\u{21E7}.)"
                     : "Show hidden files (\u{2318}\u{21E7}.)"
+            )
+
+            Button {
+                dispatcher.perform(.toggleDirectoriesFirst)
+            } label: {
+                Image(systemName: grouping ? "folder.fill" : "folder")
+                    .foregroundStyle(grouping ? Color.accentColor : Color.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(
+                grouping
+                    ? "Folders group before files \u{2014} click to sort them together (\u{2303}G)"
+                    : "Folders sort among the files \u{2014} click to group them first (\u{2303}G)"
             )
 
             Button {
