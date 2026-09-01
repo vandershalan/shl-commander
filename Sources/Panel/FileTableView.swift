@@ -16,6 +16,9 @@ struct FileTableView: NSViewRepresentable {
     let sort: SortOrder
     /// Row height, fonts, icons and column widths all come off this.
     let scale: UIScale
+    /// Whether folder and file rows are drawn bold, straight from the preferences.
+    let boldDirectories: Bool
+    let boldFiles: Bool
     /// Drives first-responder handoff between the two panes.
     let isActive: Bool
     /// Opens the in-place editor when this counter changes.
@@ -85,6 +88,8 @@ struct FileTableView: NSViewRepresentable {
         // After the table is inside the scroll view: the header lives in the scroll view's own
         // clip view, so it is only sized once there is one to re-tile.
         context.coordinator.scale = scale
+        context.coordinator.boldDirectories = boldDirectories
+        context.coordinator.boldFiles = boldFiles
         context.coordinator.applyScale(to: table)
         return scroll
     }
@@ -113,6 +118,12 @@ struct FileTableView: NSViewRepresentable {
             controller.scale = scale
             controller.applyScale(to: table)
             // Cells are cached per scale, so this is what swaps in the newly sized ones.
+            controller.reloadRows(on: table)
+        }
+
+        if controller.boldDirectories != boldDirectories || controller.boldFiles != boldFiles {
+            controller.boldDirectories = boldDirectories
+            controller.boldFiles = boldFiles
             controller.reloadRows(on: table)
         }
 

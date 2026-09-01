@@ -22,6 +22,26 @@ struct AppSettingsTests {
         #expect(settings.showHiddenByDefault == false)
         #expect(settings.editorBundleIdentifier.isEmpty)
         #expect(settings.editorName == "System default")
+        #expect(settings.directoriesFirst)
+        #expect(settings.boldDirectories == false)
+        #expect(settings.boldFiles == false)
+    }
+
+    @Test("row weights and folder grouping survive a restart")
+    func displayPreferencesPersist() {
+        let suite = "shl-commander.tests.weights.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+
+        let settings = AppSettings(defaults: defaults)
+        settings.boldDirectories = true
+        settings.boldFiles = false
+        settings.directoriesFirst = false
+
+        let reopened = AppSettings(defaults: defaults)
+        #expect(reopened.boldDirectories)
+        #expect(reopened.boldFiles == false)
+        #expect(reopened.directoriesFirst == false)
     }
 
     @Test("start directories default to the home folder")

@@ -36,6 +36,8 @@ struct PanelView: View {
                 measuringDirectories: panel.measuringDirectories,
                 sort: panel.sort,
                 scale: scale,
+                boldDirectories: AppSettings.shared.boldDirectories,
+                boldFiles: AppSettings.shared.boldFiles,
                 isActive: isActive,
                 renameRequestID: panel.renameRequestID,
                 onCursorChange: { panel.cursor = $0 },

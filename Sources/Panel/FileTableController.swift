@@ -165,6 +165,11 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// it, so ⌘+/⌘- move the rows, fonts and icons together.
     var scale = UIScale.standard
 
+    /// Row weights, pushed in by `FileTableView` the way `scale` is. Marked rows stay bold
+    /// whatever these say.
+    var boldDirectories = false
+    var boldFiles = false
+
     private var rowFont: NSFont { NSFont.systemFont(ofSize: scale(12)) }
     private var numericFont: NSFont {
         NSFont.monospacedDigitSystemFont(ofSize: scale(12), weight: .regular)
@@ -216,7 +221,7 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
 
         let isMarked = marks.contains(entry.url)
         cell.textField?.textColor = Self.color(for: entry, column: column, marked: isMarked)
-        cell.textField?.font = font(for: column, marked: isMarked)
+        cell.textField?.font = font(for: column, entry: entry, marked: isMarked)
         return cell
     }
 
@@ -230,10 +235,12 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
         return column == .name ? .labelColor : .secondaryLabelColor
     }
 
-    /// Bold reinforces the mark colour for anyone who cannot rely on red alone.
-    private func font(for column: ColumnID, marked: Bool) -> NSFont {
+    /// Bold reinforces the mark colour for anyone who cannot rely on red alone, and is also
+    /// what the folder and file weight preferences select.
+    private func font(for column: ColumnID, entry: FileEntry, marked: Bool) -> NSFont {
         let base = column == .name || column == .ext ? rowFont : numericFont
-        guard marked else { return base }
+        let bold = marked || (entry.isDirectory ? boldDirectories : boldFiles)
+        guard bold else { return base }
         return NSFontManager.shared.convert(base, toHaveTrait: .boldFontMask)
     }
 

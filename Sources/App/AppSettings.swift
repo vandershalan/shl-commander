@@ -19,8 +19,12 @@ final class AppSettings {
             Key.showHiddenByDefault: false,
             Key.directoriesFirst: true,
             Key.uiScale: UIScale.standard.factor,
+            Key.boldDirectories: false,
+            Key.boldFiles: false,
         ])
         self.uiScale = Self.clamped(defaults.double(forKey: Key.uiScale))
+        self.boldDirectories = defaults.bool(forKey: Key.boldDirectories)
+        self.boldFiles = defaults.bool(forKey: Key.boldFiles)
     }
 
     private enum Key {
@@ -31,6 +35,8 @@ final class AppSettings {
         static let leftStartDirectory = "leftStartDirectory"
         static let rightStartDirectory = "rightStartDirectory"
         static let uiScale = "uiScale"
+        static let boldDirectories = "boldDirectories"
+        static let boldFiles = "boldFiles"
     }
 
     /// Interface zoom, driven by ⌘+, ⌘- and ⌘0.
@@ -47,6 +53,18 @@ final class AppSettings {
             }
             defaults.set(uiScale, forKey: Key.uiScale)
         }
+    }
+
+    /// Whether folder rows are drawn bold. Stored rather than read back out of `UserDefaults`
+    /// for the same reason as `uiScale`: `@Observable` only tracks stored properties, and the
+    /// panes have to redraw the moment this changes.
+    var boldDirectories: Bool {
+        didSet { defaults.set(boldDirectories, forKey: Key.boldDirectories) }
+    }
+
+    /// Whether file rows are drawn bold.
+    var boldFiles: Bool {
+        didSet { defaults.set(boldFiles, forKey: Key.boldFiles) }
     }
 
     /// A factor outside the step range — hand-edited into the defaults, or written by an

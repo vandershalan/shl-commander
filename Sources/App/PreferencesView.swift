@@ -61,6 +61,26 @@ private struct GeneralPreferences: View {
                         set: { settings.showHiddenByDefault = $0 }
                     )
                 )
+                Picker(
+                    "Folder names",
+                    selection: Binding(
+                        get: { settings.boldDirectories },
+                        set: { settings.boldDirectories = $0 }
+                    )
+                ) {
+                    Text("Normal").tag(false)
+                    Text("Bold").tag(true)
+                }
+                Picker(
+                    "File names",
+                    selection: Binding(
+                        get: { settings.boldFiles },
+                        set: { settings.boldFiles = $0 }
+                    )
+                ) {
+                    Text("Normal").tag(false)
+                    Text("Bold").tag(true)
+                }
                 Toggle(
                     "Group folders before files when sorting",
                     isOn: Binding(
