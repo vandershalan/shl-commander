@@ -62,6 +62,15 @@ final class PanelViewModel: Identifiable {
         }
     }
 
+    /// Applies the window-wide folder grouping to the panel and to every tab it holds, so a
+    /// tab switch cannot bring the old grouping back.
+    func setDirectoriesFirst(_ grouping: Bool) {
+        for index in tabs.indices {
+            tabs[index].sort.directoriesFirst = grouping
+        }
+        sort.directoriesFirst = grouping
+    }
+
     var showHidden: Bool = false {
         didSet {
             guard showHidden != oldValue else { return }

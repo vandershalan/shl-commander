@@ -91,6 +91,7 @@ extension Keymap {
         .sortByDate: [chord("ctrl+f5"), chord("cmd+opt+3")],
         .sortBySize: [chord("ctrl+f6"), chord("cmd+opt+4")],
         .toggleHidden: [chord("ctrl+h"), chord("cmd+shift+period")],
+        .toggleDirectoriesFirst: [chord("ctrl+g"), chord("cmd+opt+g")],
         .clearFilter: [chord("escape")],
         .measureSelectedDirectories: [chord("ctrl+l"), chord("cmd+l")],
         .measureAllDirectories: [chord("opt+shift+return"), chord("cmd+shift+l")],

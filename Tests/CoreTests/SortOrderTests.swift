@@ -54,6 +54,19 @@ struct SortOrderTests {
         #expect(names(order.sorted(rows)) == ["a-dir", "b.txt", "c.txt"])
     }
 
+    @Test("date sort with grouping off puts the newest row first, folder or file")
+    func dateOrderMixed() {
+        let rows = [
+            entry("old-dir", dir: true, date: Date(timeIntervalSince1970: 100)),
+            entry("new.txt", date: Date(timeIntervalSince1970: 300)),
+            entry("mid-dir", dir: true, date: Date(timeIntervalSince1970: 200)),
+        ]
+        var order = SortOrder(key: .date, ascending: false, directoriesFirst: false)
+        #expect(names(order.sorted(rows)) == ["new.txt", "mid-dir", "old-dir"])
+        order.directoriesFirst = true
+        #expect(names(order.sorted(rows)) == ["mid-dir", "old-dir", "new.txt"])
+    }
+
     @Test("names sort naturally, so file10 follows file9")
     func naturalNameOrder() {
         let rows = [entry("file10.txt"), entry("file9.txt"), entry("file1.txt")]

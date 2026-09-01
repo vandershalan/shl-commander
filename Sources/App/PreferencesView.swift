@@ -61,6 +61,19 @@ private struct GeneralPreferences: View {
                         set: { settings.showHiddenByDefault = $0 }
                     )
                 )
+                Toggle(
+                    "Group folders before files when sorting",
+                    isOn: Binding(
+                        get: { settings.directoriesFirst },
+                        set: {
+                            settings.directoriesFirst = $0
+                            // Takes effect straight away, so the panes never disagree with
+                            // what the checkbox says.
+                            state.left.setDirectoriesFirst($0)
+                            state.right.setDirectoriesFirst($0)
+                        }
+                    )
+                )
             }
 
             Section("Open With") {

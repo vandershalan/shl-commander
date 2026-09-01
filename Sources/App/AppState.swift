@@ -135,5 +135,10 @@ final class AppState {
             left.navigate(to: left.directory)
             right.navigate(to: right.directory)
         }
+
+        // Folder grouping is a window-wide preference, so it wins over whatever the restored
+        // tabs were saved with.
+        left.setDirectoriesFirst(settings.directoriesFirst)
+        right.setDirectoriesFirst(settings.directoriesFirst)
     }
 }

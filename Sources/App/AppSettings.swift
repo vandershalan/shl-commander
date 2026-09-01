@@ -17,6 +17,7 @@ final class AppSettings {
         defaults.register(defaults: [
             Key.restoreSession: true,
             Key.showHiddenByDefault: false,
+            Key.directoriesFirst: true,
             Key.uiScale: UIScale.standard.factor,
         ])
         self.uiScale = Self.clamped(defaults.double(forKey: Key.uiScale))
@@ -25,6 +26,7 @@ final class AppSettings {
     private enum Key {
         static let restoreSession = "restoreSession"
         static let showHiddenByDefault = "showHiddenByDefault"
+        static let directoriesFirst = "directoriesFirst"
         static let editorBundleIdentifier = "editorBundleIdentifier"
         static let leftStartDirectory = "leftStartDirectory"
         static let rightStartDirectory = "rightStartDirectory"
@@ -63,6 +65,13 @@ final class AppSettings {
     var showHiddenByDefault: Bool {
         get { defaults.bool(forKey: Key.showHiddenByDefault) }
         set { defaults.set(newValue, forKey: Key.showHiddenByDefault) }
+    }
+
+    /// When on, folders sort as their own group ahead of files. When off, every row is
+    /// ordered by the sort key alone, so a folder and a file with the same date sit together.
+    var directoriesFirst: Bool {
+        get { defaults.bool(forKey: Key.directoriesFirst) }
+        set { defaults.set(newValue, forKey: Key.directoriesFirst) }
     }
 
     /// Bundle identifier used by F4. Empty means "whatever the system would open it with".

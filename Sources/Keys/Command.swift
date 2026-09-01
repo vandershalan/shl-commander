@@ -42,6 +42,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
     case sortByDate
     case sortBySize
     case toggleHidden
+    case toggleDirectoriesFirst
     case clearFilter
     case measureSelectedDirectories
     case measureAllDirectories
@@ -119,6 +120,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .sortByDate: return "Sort by Date"
         case .sortBySize: return "Sort by Size"
         case .toggleHidden: return "Show Hidden Files"
+        case .toggleDirectoriesFirst: return "Group Folders First"
         case .clearFilter: return "Clear Filter"
         case .measureSelectedDirectories: return "Measure Selected Folders"
         case .measureAllDirectories: return "Measure All Folders"
@@ -158,6 +160,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
             .connectToServer:
             return .go
         case .refresh, .sortByName, .sortByExtension, .sortByDate, .sortBySize, .toggleHidden,
+            .toggleDirectoriesFirst,
             .clearFilter, .measureSelectedDirectories, .measureAllDirectories,
             .zoomIn, .zoomOut, .resetZoom:
             return .view

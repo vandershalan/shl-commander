@@ -85,6 +85,12 @@ struct CommandDispatcher {
             panel.sort = panel.sort.toggled(to: .date)
         case .sortBySize:
             panel.sort = panel.sort.toggled(to: .size)
+        case .toggleDirectoriesFirst:
+            // Both panes follow, like Show Hidden Files: one grouping rule for the window.
+            let grouping = !panel.sort.directoriesFirst
+            state.settings.directoriesFirst = grouping
+            state.left.setDirectoriesFirst(grouping)
+            state.right.setDirectoriesFirst(grouping)
         case .toggleHidden:
             // Both panes follow, so the two never disagree about what exists.
             let showing = !panel.showHidden
