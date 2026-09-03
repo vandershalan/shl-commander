@@ -16,9 +16,13 @@ struct CloudPlace: Identifiable, Hashable, Sendable {
 
     var id: URL { url }
 
+    /// The provider as a person would write it. The folder name has the spaces stripped out,
+    /// so "GoogleDrive" has to be spelled back out before it is shown.
+    var displayProvider: String { CloudService.displayName(for: provider) }
+
     /// What the menu shows. The account is what distinguishes two roots of one provider, so it
     /// leads; the provider name is the group heading above it.
-    var title: String { account.isEmpty ? provider : account }
+    var title: String { account.isEmpty ? displayProvider : account }
 }
 
 @MainActor
@@ -78,6 +82,33 @@ final class CloudService {
             }
 
         places = found
+    }
+
+    /// Whether a Google Drive root is mounted. False both when Google Drive for desktop is
+    /// not installed and when it is installed but has never been signed in — either way there
+    /// is nothing to browse, and the menu offers the download instead.
+    var hasGoogleDrive: Bool {
+        places.contains { $0.provider == Self.googleDriveProvider }
+    }
+
+    /// The folder name Google Drive for desktop creates, before the account suffix.
+    static let googleDriveProvider = "GoogleDrive"
+
+    /// Where the menu sends anyone without Google Drive installed.
+    static let googleDriveDownload = URL(string: "https://www.google.com/drive/download/")!
+
+    /// Providers whose folder name is not what the product is called. Anything not listed is
+    /// shown as macOS spells it, which is right for the single-word ones (Dropbox, Box) and
+    /// for the camel-cased ones a rule would only mangle (OneDrive would become "One Drive").
+    nonisolated private static let displayNames: [String: String] = [
+        "GoogleDrive": "Google Drive",
+        "ProtonDrive": "Proton Drive",
+        "pCloudDrive": "pCloud",
+        "CreativeCloud": "Creative Cloud",
+    ]
+
+    nonisolated static func displayName(for provider: String) -> String {
+        displayNames[provider] ?? provider
     }
 
     /// `OneDrive-Personal` → `("OneDrive", "Personal")`.

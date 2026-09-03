@@ -50,6 +50,37 @@ struct CloudServiceTests {
         #expect(CloudService.split("Dropbox") == ("Dropbox", ""))
     }
 
+    @Test("provider folder names are spelled out for the menu")
+    func displayNames() throws {
+        let tree = try TempTree("cloud-names")
+        defer { tree.remove() }
+        let cloud = try service(in: tree)
+
+        #expect(CloudService.displayName(for: "GoogleDrive") == "Google Drive")
+        #expect(CloudService.displayName(for: "OneDrive") == "OneDrive", "already spelled right")
+        #expect(CloudService.displayName(for: "Dropbox") == "Dropbox")
+
+        let drive = cloud.places.first { $0.provider == "GoogleDrive" }
+        #expect(drive?.displayProvider == "Google Drive")
+        #expect(drive?.title == "someone@example.com", "the account distinguishes two roots")
+    }
+
+    @Test("Google Drive counts as installed only once a root exists")
+    func googleDriveDetection() throws {
+        let tree = try TempTree("cloud-drive")
+        defer { tree.remove() }
+        #expect(try service(in: tree).hasGoogleDrive)
+
+        let bare = try TempTree("cloud-no-drive")
+        defer { bare.remove() }
+        try bare.directory("CloudStorage/OneDrive-Osobisty")
+        let without = CloudService(
+            cloudStorage: bare.root.appendingPathComponent("CloudStorage"),
+            mobileDocuments: bare.root.appendingPathComponent("Mobile Documents")
+        )
+        #expect(without.hasGoogleDrive == false)
+    }
+
     @Test("files sitting in CloudStorage are not offered as places")
     func ignoresFiles() throws {
         let tree = try TempTree("cloud-files")

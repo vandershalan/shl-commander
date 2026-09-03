@@ -142,16 +142,16 @@ struct PanelView: View {
 
             // Each provider gets its own submenu: one OneDrive install can hold a personal
             // account and several shared libraries, which flattened would swamp the volumes.
-            if !cloud.places.isEmpty {
+            if !cloud.places.isEmpty || !cloud.hasGoogleDrive {
                 Divider()
                 ForEach(cloud.byProvider, id: \.provider) { group in
                     if group.places.count == 1, let place = group.places.first {
-                        Button(place.provider) {
+                        Button(place.displayProvider) {
                             onActivate()
                             panel.navigate(to: place.url)
                         }
                     } else {
-                        Menu(group.provider) {
+                        Menu(CloudService.displayName(for: group.provider)) {
                             ForEach(group.places) { place in
                                 Button(place.title) {
                                     onActivate()
@@ -159,6 +159,15 @@ struct PanelView: View {
                                 }
                             }
                         }
+                    }
+                }
+
+                // Google Drive is browsed through its File Provider folder like every other
+                // cloud here, so with the desktop app missing there is nothing to open — only
+                // somewhere to send anyone who wants it.
+                if !cloud.hasGoogleDrive {
+                    Button("Google Drive (not installed)…") {
+                        NSWorkspace.shared.open(CloudService.googleDriveDownload)
                     }
                 }
             }
