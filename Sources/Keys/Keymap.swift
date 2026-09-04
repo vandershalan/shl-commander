@@ -67,8 +67,12 @@ extension Keymap {
         .duplicate: [chord("shift+f5"), chord("cmd+d")],
         .renameInPlace: [chord("shift+f6"), chord("cmd+return")],
         // ⌘⌫ is what the Finder uses, so the muscle memory transfers either way.
-        .moveToTrash: [chord("f8"), chord("cmd+backspace")],
-        .deletePermanently: [chord("shift+f8"), chord("cmd+shift+backspace")],
+        // Del is the forward-delete key, fn+Delete on a laptop keyboard. Plain Delete stays
+        // bound to Enclosing Folder, the way it moves a pane up in Total Commander.
+        .moveToTrash: [chord("f8"), chord("forwarddelete"), chord("cmd+backspace")],
+        .deletePermanently: [
+            chord("shift+f8"), chord("shift+forwarddelete"), chord("cmd+shift+backspace"),
+        ],
         // Total Commander packs with ⌥F5 and unpacks with ⌥F9; ⌘I is the Finder's info panel.
         .createArchive: [chord("opt+f5"), chord("cmd+shift+p")],
         .unpackArchive: [chord("opt+f9"), chord("cmd+shift+u")],

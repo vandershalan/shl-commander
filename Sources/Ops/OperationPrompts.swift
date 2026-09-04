@@ -9,12 +9,30 @@ import AppKit
 /// testable.
 @MainActor
 struct OperationPrompts {
-    /// Width every operation dialog is built to.
+    /// Narrowest an operation dialog is built to.
     ///
     /// `NSAlert` sizes itself around its accessory view, so this is what makes these dialogs wide
     /// enough to read a full path in. The default width fits roughly a folder name and nothing
     /// more, which is useless for confirming *which* file is about to be overwritten or deleted.
-    static let dialogWidth: CGFloat = 620
+    static let dialogWidth: CGFloat = 800
+
+    /// Widest one grows before a path is better read wrapped than tracked across the screen.
+    private static let maximumWidth: CGFloat = 1400
+
+    /// Grows the dialog to fit the longest line it shows, within the two bounds above and
+    /// whatever the screen can hold.
+    static func width(fitting lines: [String]) -> CGFloat {
+        let cap = min(
+            maximumWidth, max(400, (NSScreen.main?.visibleFrame.width ?? maximumWidth) - 80))
+        guard !lines.isEmpty else { return min(dialogWidth, cap) }
+
+        let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        let widest = lines.reduce(CGFloat(0)) { widest, line in
+            max(widest, (line as NSString).size(withAttributes: [.font: font]).width)
+        }
+        // Text inset inside the list, plus room for a scroller once it is long.
+        return min(max(dialogWidth, widest + 28), cap)
+    }
 
     /// Tallest a path list grows before it scrolls instead.
     private static let listMaxHeight: CGFloat = 220
@@ -145,7 +163,7 @@ struct OperationPrompts {
         let scroll = NSScrollView(
             frame: NSRect(
                 x: 0, y: 0,
-                width: dialogWidth,
+                width: width(fitting: lines.flatMap { $0.components(separatedBy: "\n") }),
                 height: min(listMaxHeight, max(34, estimated))
             )
         )
@@ -175,7 +193,10 @@ struct OperationPrompts {
         let height =
             views.reduce(0) { $0 + max($1.frame.height, 18) }
             + CGFloat(max(0, views.count - 1)) * spacing
-        stack.frame = NSRect(x: 0, y: 0, width: dialogWidth, height: height)
+        // As wide as the widest thing in it — a path list has already sized itself to its
+        // longest line, and the stack must not clip it back to the minimum.
+        let width = views.reduce(dialogWidth) { max($0, $1.frame.width) }
+        stack.frame = NSRect(x: 0, y: 0, width: width, height: height)
         return stack
     }
 }

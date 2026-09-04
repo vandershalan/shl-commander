@@ -297,3 +297,30 @@ struct OperationSheetModelTests {
         #expect(model.isPresented == false)
     }
 }
+
+@MainActor
+@Suite("Dialog width")
+struct DialogWidthTests {
+    @Test("a dialog is never narrower than the minimum, whatever it shows")
+    func minimumHolds() {
+        #expect(OperationPrompts.width(fitting: []) == OperationPrompts.dialogWidth)
+        #expect(OperationPrompts.width(fitting: ["/tmp/a.txt"]) == OperationPrompts.dialogWidth)
+    }
+
+    @Test("a path too long for the minimum widens the dialog")
+    func longPathWidens() {
+        let long = "/Users/someone/Downloads/" + String(repeating: "n", count: 160) + ".xlsx"
+        let width = OperationPrompts.width(fitting: [long])
+        #expect(width > OperationPrompts.dialogWidth)
+        // Still bounded: a path of any length cannot push the dialog off the screen.
+        #expect(width <= 1400)
+    }
+
+    @Test("the widest line is what the width follows")
+    func widestLineWins() {
+        let long = String(repeating: "x", count: 200)
+        #expect(
+            OperationPrompts.width(fitting: ["/tmp/a", long])
+                == OperationPrompts.width(fitting: [long]))
+    }
+}

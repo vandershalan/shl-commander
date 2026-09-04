@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The one sheet an operation lives in: confirm, then progress, then anything that went wrong.
@@ -23,11 +24,54 @@ struct OperationSheetView: View {
                 EmptyView()
             }
         }
-        // Wide enough for a full path, which is the whole reason these are not stock alerts.
-        .frame(width: scale(620))
+        // Wide enough for the longest path on show, which is the whole reason these are not
+        // stock alerts.
+        .frame(width: sheetWidth)
         // Semantic fonts do not follow a zoom, so the sizes AppKit gives them are spelled out
         // and scaled: 13 for a headline, 12 for a callout, 10 for a caption.
         .font(.system(size: scale(13)))
+    }
+
+    /// Narrowest the sheet ever gets, before the zoom is applied. Everything below this is
+    /// wider than the buttons and the prose need, so there is nothing to gain by shrinking.
+    private static let minimumWidth: CGFloat = 800
+    /// Widest it grows on a large display: past this a path is easier to read wrapped than as
+    /// one line the eye has to track across.
+    private static let maximumWidth: CGFloat = 1400
+
+    /// Grows with the longest line the current stage shows, so a full path fits on one line
+    /// instead of wrapping mid-name. Clamped: never below the minimum, never wider than the
+    /// screen can hold.
+    private var sheetWidth: CGFloat {
+        let lines = contentLines
+        let cap = min(
+            scale(Self.maximumWidth),
+            max(scale(400), (NSScreen.main?.visibleFrame.width ?? scale(Self.maximumWidth)) - 80)
+        )
+        guard !lines.isEmpty else { return min(scale(Self.minimumWidth), cap) }
+
+        let font = NSFont.monospacedSystemFont(ofSize: scale(11), weight: .regular)
+        let widest = lines.reduce(CGFloat(0)) { widest, line in
+            max(widest, (line as NSString).size(withAttributes: [.font: font]).width)
+        }
+        // What the list is inset by: the sheet's own padding, the text padding inside the
+        // list, and room for a scroller that appears once the list is long.
+        let chrome = scale(20) * 2 + scale(6) * 2 + scale(20)
+        return min(max(scale(Self.minimumWidth), widest + chrome), cap)
+    }
+
+    /// The lines the width is measured against — the paths, not the prose, which wraps happily.
+    private var contentLines: [String] {
+        switch model.stage {
+        case .confirming(let confirmation):
+            return confirmation.paths
+        case .asking(let question):
+            return ["From:  \(question.source.path)", "To:    \(question.destination.path)"]
+        case .failed(let failures):
+            return failures.flatMap { ["\($0.url.path)", "    \($0.message)"] }
+        case .running, nil:
+            return []
+        }
     }
 
     // MARK: - Confirm

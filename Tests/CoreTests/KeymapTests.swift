@@ -37,6 +37,18 @@ struct KeymapTests {
         #expect(clashes.isEmpty)
     }
 
+    @Test("Del deletes, and does not collide with Delete going up a folder")
+    func forwardDeleteBindings() {
+        let keymap = Keymap.defaults
+        let del = KeyChord(parsing: "forwarddelete")
+        let shiftDel = KeyChord(parsing: "shift+forwarddelete")
+
+        #expect(keymap.chords(for: .moveToTrash).contains { $0 == del })
+        #expect(keymap.chords(for: .deletePermanently).contains { $0 == shiftDel })
+        #expect(keymap.chords(for: .goUp).contains { $0 == KeyChord(parsing: "backspace") })
+        #expect(keymap.chords(for: .goUp).contains { $0 == del } == false)
+    }
+
     /// Key codes a stock Mac cannot produce. F1-F12 need "use F-keys as standard function
     /// keys"; Insert exists only on full-size external keyboards.
     ///
