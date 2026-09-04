@@ -32,9 +32,10 @@ struct OperationSheetView: View {
         .font(.system(size: scale(13)))
     }
 
-    /// Narrowest the sheet ever gets, before the zoom is applied. Everything below this is
-    /// wider than the buttons and the prose need, so there is nothing to gain by shrinking.
-    private static let minimumWidth: CGFloat = 800
+    /// Narrowest the sheet ever gets, before the zoom is applied — about what the buttons and
+    /// a short headline need. The width is driven by the content above this, not by a fixed
+    /// floor: a one-line path in a short folder does not deserve a half-screen dialog.
+    private static let minimumWidth: CGFloat = 520
     /// Widest it grows on a large display: past this a path is easier to read wrapped than as
     /// one line the eye has to track across.
     private static let maximumWidth: CGFloat = 1400
@@ -44,12 +45,11 @@ struct OperationSheetView: View {
     /// screen can hold.
     private var sheetWidth: CGFloat {
         let lines = contentLines
+        let headline = headlineWidth
         let cap = min(
             scale(Self.maximumWidth),
             max(scale(400), (NSScreen.main?.visibleFrame.width ?? scale(Self.maximumWidth)) - 80)
         )
-        guard !lines.isEmpty else { return min(scale(Self.minimumWidth), cap) }
-
         let font = NSFont.monospacedSystemFont(ofSize: scale(11), weight: .regular)
         let widest = lines.reduce(CGFloat(0)) { widest, line in
             max(widest, (line as NSString).size(withAttributes: [.font: font]).width)
@@ -57,7 +57,18 @@ struct OperationSheetView: View {
         // What the list is inset by: the sheet's own padding, the text padding inside the
         // list, and room for a scroller that appears once the list is long.
         let chrome = scale(20) * 2 + scale(6) * 2 + scale(20)
-        return min(max(scale(Self.minimumWidth), widest + chrome), cap)
+        let wanted = max(widest + chrome, headline)
+        return min(max(scale(Self.minimumWidth), wanted), cap)
+    }
+
+    /// The headline is a single line naming the file, so it has to fit too — a path list of
+    /// short paths must not leave the title wrapping above it.
+    private var headlineWidth: CGFloat {
+        guard case .confirming(let confirmation) = model.stage else { return 0 }
+        let font = NSFont.systemFont(ofSize: scale(13), weight: .semibold)
+        let title = (confirmation.title as NSString).size(withAttributes: [.font: font]).width
+        // Icon column, its gap, and the sheet's padding on both sides.
+        return title + scale(32) + scale(12) + scale(20) * 2
     }
 
     /// The lines the width is measured against — the paths, not the prose, which wraps happily.

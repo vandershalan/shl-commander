@@ -302,8 +302,11 @@ struct DeleteSummaryTests {
     @Test("the dialog is built wide enough for a path to be readable")
     func dialogIsWide() {
         // NSAlert sizes itself around its accessory view; the stock width fits about a folder
-        // name, which is useless for confirming which file is about to go.
-        #expect(OperationPrompts.dialogWidth >= 600)
+        // name, which is useless for confirming which file is about to go. The floor only has
+        // to clear the buttons — a long path widens the dialog past it.
+        #expect(OperationPrompts.dialogWidth >= 480)
+        let long = "/Users/someone/Downloads/" + String(repeating: "n", count: 120) + ".xlsx"
+        #expect(OperationPrompts.width(fitting: [long]) > OperationPrompts.dialogWidth)
     }
 
     @Test("a permanent delete needs typing for folders or for more than ten items")

@@ -14,7 +14,7 @@ struct OperationPrompts {
     /// `NSAlert` sizes itself around its accessory view, so this is what makes these dialogs wide
     /// enough to read a full path in. The default width fits roughly a folder name and nothing
     /// more, which is useless for confirming *which* file is about to be overwritten or deleted.
-    static let dialogWidth: CGFloat = 800
+    static let dialogWidth: CGFloat = 520
 
     /// Widest one grows before a path is better read wrapped than tracked across the screen.
     private static let maximumWidth: CGFloat = 1400
