@@ -46,6 +46,14 @@ struct ArchiveFixture {
         return url
     }
 
+    /// A zip holding one file whose name is outside ASCII.
+    func makeAccentedZip() throws -> URL {
+        let url = tree.root.appendingPathComponent("accents.zip")
+        try tree.file("payload/Szałankiewicz Tomasz.pdf", bytes: 12)
+        try run("/usr/bin/zip", ["-q", url.path, "Szałankiewicz Tomasz.pdf"])
+        return url
+    }
+
     /// `zip -P`, a zip whose entry data is encrypted while its listing stays readable.
     func makeEncryptedZip(password: String, named name: String = "secret.zip") throws -> URL {
         let url = tree.root.appendingPathComponent(name)
@@ -530,5 +538,42 @@ struct ArchiveReaderPasswordTests {
         #expect(
             FileManager.default.fileExists(
                 atPath: out.appendingPathComponent("readme.txt").path))
+    }
+}
+
+
+@Suite("ArchiveReader non-ASCII names")
+struct ArchiveReaderAccentTests {
+    @Test("the tool is run with a UTF-8 character set and a C time locale")
+    func environmentKeepsCharacters() {
+        let environment = ArchiveReader.listingEnvironment
+        #expect(environment["LC_CTYPE"] == "en_US.UTF-8")
+        #expect(environment["LC_TIME"] == "C", "month names are parsed in English")
+        // Set in the user's shell it would override both, and in the C locale bsdtar escapes
+        // every non-ASCII character out of the name it prints.
+        #expect(environment["LC_ALL"] == nil)
+    }
+
+    @Test("a Polish name is listed as itself, not as escaped bytes")
+    func listsAccentedName() throws {
+        let fixture = try ArchiveFixture("accents-list")
+        defer { fixture.remove() }
+        let archive = try fixture.makeAccentedZip()
+
+        let index = try ArchiveReader.index(of: archive)
+        #expect(index.members.map(\.path) == ["Szałankiewicz Tomasz.pdf"])
+    }
+
+    @Test("and that same name extracts, which needs it to have survived the listing")
+    func extractsAccentedName() throws {
+        let fixture = try ArchiveFixture("accents-extract")
+        defer { fixture.remove() }
+        let archive = try fixture.makeAccentedZip()
+        let out = try fixture.tree.directory("out")
+
+        let index = try ArchiveReader.index(of: archive)
+        let member = try #require(index.members.first)
+        let url = try ArchiveReader.extractOne(member: member.path, from: archive, to: out)
+        #expect(FileManager.default.fileExists(atPath: url.path))
     }
 }

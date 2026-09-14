@@ -67,9 +67,9 @@ enum ArchiveReader {
     /// Parses one `tar -tvf` line.
     ///
     /// Columns are mode, links, owner, group, size, then a three-part date, then the name.
-    /// `LC_ALL=C` is forced when running so the month is always the English abbreviation, and
-    /// the date comes in two shapes: `Jul 30 15:43` for something recent, `Jan  2  2020`
-    /// otherwise. The name is whatever follows, so spaces in it survive.
+    /// The time locale is forced to C when running so the month is always the English
+    /// abbreviation, and the date comes in two shapes: `Jul 30 15:43` for something recent,
+    /// `Jan  2  2020` otherwise. The name is whatever follows, so spaces in it survive.
     static func parse(line: String) -> ArchiveMember? {
         guard let match = listingPattern.firstMatch(
             in: line,
@@ -368,10 +368,7 @@ enum ArchiveReader {
         process.arguments = withPassphrase(arguments, passphrase)
         // Nothing to type into: a password prompt bsdtar writes here has to fail, never wait.
         process.standardInput = FileHandle.nullDevice
-        // The listing parser depends on English month names and the C column layout. The path
-        // matters too: bsdtar shells out to `zstd` for a .tar.zst, and the app inherits no
-        // login shell PATH to find it on.
-        process.environment = ToolPath.environment(adding: ["LC_ALL": "C"])
+        process.environment = listingEnvironment
 
         let output = Pipe()
         let errors = Pipe()
@@ -405,6 +402,28 @@ enum ArchiveReader {
             at: min(2, arguments.count)
         )
         return arguments
+    }
+
+    /// The environment bsdtar is run in.
+    ///
+    /// The character set matters as much as the path here. bsdtar writes member names through
+    /// the locale, and in the C locale everything outside ASCII comes out escaped — `ł` as the
+    /// four characters `\305\202` — which is neither a name to show nor a name that can be
+    /// handed back to extract that member. A UTF-8 ctype keeps the real characters, while the
+    /// time locale stays C so the listing's month is always the English abbreviation the parser
+    /// expects. `LC_ALL` would override both, and the user's shell may well have set it, so it
+    /// is cleared rather than merely not set.
+    ///
+    /// The path matters too: bsdtar shells out to `zstd` for a .tar.zst, and the app inherits
+    /// no login shell PATH to find it on.
+    static var listingEnvironment: [String: String] {
+        var environment = ToolPath.environment(adding: [
+            "LANG": "en_US.UTF-8",
+            "LC_CTYPE": "en_US.UTF-8",
+            "LC_TIME": "C",
+        ])
+        environment.removeValue(forKey: "LC_ALL")
+        return environment
     }
 
     /// True when bsdtar failed because the archive is encrypted.
