@@ -11,6 +11,7 @@ enum ArchiveReader {
         case unsupported(String)
         case toolFailed(status: Int32, message: String)
         case missingTool(String)
+        case passphraseNeeded(String)
         case cancelled
 
         var errorDescription: String? {
@@ -21,6 +22,9 @@ enum ArchiveReader {
                 return message.isEmpty ? "The archive could not be read." : message
             case .missingTool(let name):
                 return "\(name) is needed to open this file and is not installed."
+            case .passphraseNeeded(let name):
+                return
+                    "\u{22}\(name)\u{22} is password-protected, and no accepted password was given."
             case .cancelled:
                 return "Cancelled"
             }
@@ -29,6 +33,14 @@ enum ArchiveReader {
 
     private static let tool = URL(fileURLWithPath: "/usr/bin/tar")
 
+    /// Handed to bsdtar whenever no password is known.
+    ///
+    /// Without `--passphrase` bsdtar meets an encrypted entry and asks for a password on its
+    /// terminal — and with nothing attached to its input it asks again, and again, with the app
+    /// waiting on a process that will never exit. A placeholder turns that hang into one clean
+    /// "Incorrect passphrase" failure, which is what prompts the user for the real one.
+    static let placeholderPassphrase = "\u{1}shl-commander-none\u{1}"
+
     // MARK: - Listing
 
     /// Lists an archive.
@@ -36,7 +48,7 @@ enum ArchiveReader {
     /// The format comes from the file's content, so an archive whose name is wrong still opens.
     /// A single compressed stream has no table of contents to read, so its one payload is
     /// described directly.
-    static func index(of archive: URL) throws -> ArchiveIndex {
+    static func index(of archive: URL, passphrase: String? = nil) throws -> ArchiveIndex {
         guard let format = ArchiveProbe.format(of: archive) else {
             throw Failure.unsupported(archive.lastPathComponent)
         }
@@ -44,7 +56,7 @@ enum ArchiveReader {
             return singleStreamIndex(of: archive, format: format)
         }
 
-        let output = try run(["-tvf", archive.path])
+        let output = try run(["-tvf", archive.path], on: archive, passphrase: passphrase)
         let members = output
             .split(separator: "\n", omittingEmptySubsequences: true)
             .compactMap { parse(line: String($0)) }
@@ -287,6 +299,7 @@ enum ArchiveReader {
         members: [String],
         from archive: URL,
         to directory: URL,
+        passphrase: String? = nil,
         isCancelled: () -> Bool = { false }
     ) throws {
         guard !members.isEmpty else { return }
@@ -305,7 +318,8 @@ enum ArchiveReader {
 
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         // -C changes directory before extracting, so member paths stay relative to it.
-        _ = try run(["-xf", archive.path, "-C", directory.path] + safe)
+        _ = try run(
+            ["-xf", archive.path, "-C", directory.path] + safe, on: archive, passphrase: passphrase)
     }
 
     /// Extracts an archive whole, without listing it first.
@@ -315,6 +329,7 @@ enum ArchiveReader {
     static func extractAll(
         from archive: URL,
         to directory: URL,
+        passphrase: String? = nil,
         isCancelled: () -> Bool = { false }
     ) throws {
         guard let format = ArchiveProbe.format(of: archive) else {
@@ -327,25 +342,32 @@ enum ArchiveReader {
         }
         if isCancelled() { throw Failure.cancelled }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        _ = try run(["-xf", archive.path, "-C", directory.path])
+        _ = try run(["-xf", archive.path, "-C", directory.path], on: archive, passphrase: passphrase)
     }
 
     /// Extracts one member and returns where it landed.
     static func extractOne(
         member: String,
         from archive: URL,
-        to directory: URL
+        to directory: URL,
+        passphrase: String? = nil
     ) throws -> URL {
-        try extract(members: [member], from: archive, to: directory)
+        try extract(members: [member], from: archive, to: directory, passphrase: passphrase)
         return directory.appendingPathComponent(ArchiveIndex.normalise(member))
     }
 
     // MARK: - Process
 
-    private static func run(_ arguments: [String]) throws -> String {
+    private static func run(
+        _ arguments: [String],
+        on archive: URL,
+        passphrase: String?
+    ) throws -> String {
         let process = Process()
         process.executableURL = tool
-        process.arguments = arguments
+        process.arguments = withPassphrase(arguments, passphrase)
+        // Nothing to type into: a password prompt bsdtar writes here has to fail, never wait.
+        process.standardInput = FileHandle.nullDevice
         // The listing parser depends on English month names and the C column layout. The path
         // matters too: bsdtar shells out to `zstd` for a .tar.zst, and the app inherits no
         // login shell PATH to find it on.
@@ -364,12 +386,32 @@ enum ArchiveReader {
         process.waitUntilExit()
 
         guard process.terminationStatus == 0 else {
-            throw Failure.toolFailed(
-                status: process.terminationStatus,
-                message: String(data: errorData, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            )
+            let message = String(data: errorData, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if mentionsPassphrase(message) {
+                throw Failure.passphraseNeeded(archive.lastPathComponent)
+            }
+            throw Failure.toolFailed(status: process.terminationStatus, message: message)
         }
         return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    /// Places the password after the mode and its file, and before any member patterns — where
+    /// bsdtar still reads it as an option rather than as something to extract.
+    static func withPassphrase(_ arguments: [String], _ passphrase: String?) -> [String] {
+        var arguments = arguments
+        arguments.insert(
+            contentsOf: ["--passphrase", passphrase ?? placeholderPassphrase],
+            at: min(2, arguments.count)
+        )
+        return arguments
+    }
+
+    /// True when bsdtar failed because the archive is encrypted.
+    ///
+    /// libarchive says "Incorrect passphrase" for a wrong password and "Passphrase required"
+    /// when it has none; both mean the same thing here — ask the user and try again.
+    static func mentionsPassphrase(_ message: String) -> Bool {
+        message.lowercased().contains("passphrase")
     }
 }

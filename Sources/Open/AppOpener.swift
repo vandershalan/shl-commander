@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 /// Opening files and folders in a named application.
 @MainActor
@@ -16,7 +17,7 @@ enum AppOpener {
         var result: [OpenWithApp] = []
 
         for url in urls.prefix(1) {
-            for application in NSWorkspace.shared.urlsForApplications(toOpen: url) {
+            for application in applications(toOpen: url) {
                 let app = OpenWithApp(url: application)
                 if seen.insert(app.path).inserted { result.append(app) }
             }
@@ -27,9 +28,29 @@ enum AppOpener {
         return result
     }
 
+    /// Apps for one item, asked by name when there is no file at that path.
+    ///
+    /// A row inside an archive has a synthetic URL — nothing is on disk until it is extracted —
+    /// and the system answers nothing for a path that does not exist. Its extension still names
+    /// a type, and the apps for that type are exactly the right list to offer.
+    private static func applications(toOpen url: URL) -> [URL] {
+        let direct = NSWorkspace.shared.urlsForApplications(toOpen: url)
+        guard direct.isEmpty, !FileManager.default.fileExists(atPath: url.path),
+            let type = UTType(filenameExtension: url.pathExtension)
+        else { return direct }
+        return NSWorkspace.shared.urlsForApplications(toOpen: type)
+    }
+
     /// The app the system would use by default, so the menu can mark it.
     static func defaultApplication(for url: URL) -> OpenWithApp? {
-        NSWorkspace.shared.urlForApplication(toOpen: url).map(OpenWithApp.init(url:))
+        if let application = NSWorkspace.shared.urlForApplication(toOpen: url) {
+            return OpenWithApp(url: application)
+        }
+        guard !FileManager.default.fileExists(atPath: url.path),
+            let type = UTType(filenameExtension: url.pathExtension),
+            let application = NSWorkspace.shared.urlForApplication(toOpen: type)
+        else { return nil }
+        return OpenWithApp(url: application)
     }
 
     /// Opens everything in one app, remembering the choice.
@@ -60,6 +81,36 @@ enum AppOpener {
                     OperationFailure(url: application, message: message)
                 ])
             }
+        }
+    }
+
+    /// Opens panel rows, extracting any that live inside an archive first.
+    ///
+    /// The extracted copy is what the app is handed, so edits to it are never written back into
+    /// the archive — the same bargain every other way of opening a member makes.
+    static func open(_ targets: [FileEntry], with application: URL) {
+        Task {
+            var urls: [URL] = []
+            for entry in targets {
+                guard let origin = entry.archive else {
+                    urls.append(entry.url)
+                    continue
+                }
+                do {
+                    urls.append(
+                        try await ArchiveStore.shared.materialise(
+                            member: origin.member, from: origin.archive))
+                } catch ArchiveReader.Failure.cancelled {
+                    // The password dialog was dismissed; nothing to report.
+                    return
+                } catch {
+                    OperationPrompts.report([
+                        OperationFailure(url: entry.url, message: error.localizedDescription)
+                    ])
+                    return
+                }
+            }
+            open(urls, with: application)
         }
     }
 

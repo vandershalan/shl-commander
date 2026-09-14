@@ -115,6 +115,29 @@ struct OperationPrompts {
         return name.isEmpty ? nil : name
     }
 
+    /// Asks for the password of an encrypted archive.
+    ///
+    /// A secure field, and no "remember" checkbox: the password is kept for the session either
+    /// way and never written anywhere, so the only choice worth offering is whether to type it.
+    static func askForPassphrase(archive: URL, afterFailure: Bool = false) -> String? {
+        let alert = NSAlert()
+        alert.messageText = "Password for \u{22}\(archive.lastPathComponent)\u{22}"
+        alert.informativeText =
+            afterFailure
+            ? "That password was not accepted. The archive is encrypted; try again."
+            : "This archive is encrypted. The password is kept until the app quits."
+
+        let field = NSSecureTextField(string: "")
+        field.frame = NSRect(x: 0, y: 0, width: dialogWidth, height: 24)
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+        alert.addButton(withTitle: "Open")
+        alert.addButton(withTitle: "Cancel")
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return field.stringValue.isEmpty ? nil : field.stringValue
+    }
+
     static func report(_ failures: [OperationFailure]) {
         guard !failures.isEmpty else { return }
         let alert = NSAlert()

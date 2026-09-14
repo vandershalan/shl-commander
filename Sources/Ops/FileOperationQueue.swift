@@ -154,12 +154,17 @@ final class FileOperationQueue {
         defer { try? fileManager.removeItem(at: staging) }
 
         do {
-            try ArchiveReader.extract(
-                members: members,
-                from: archive,
-                to: staging,
-                isCancelled: { Task.isCancelled }
-            )
+            // A password-protected archive asks for its password here, and the extraction is
+            // retried with it.
+            try await ArchivePassphrase.retrying(on: archive) { passphrase in
+                try ArchiveReader.extract(
+                    members: members,
+                    from: archive,
+                    to: staging,
+                    passphrase: passphrase,
+                    isCancelled: { Task.isCancelled }
+                )
+            }
         } catch {
             await record(OperationFailure(url: archive, message: error.localizedDescription))
             return
@@ -305,8 +310,11 @@ final class FileOperationQueue {
         defer { try? fileManager.removeItem(at: staging) }
 
         do {
-            try ArchiveReader.extractAll(
-                from: archive, to: staging, isCancelled: { Task.isCancelled })
+            try await ArchivePassphrase.retrying(on: archive) { passphrase in
+                try ArchiveReader.extractAll(
+                    from: archive, to: staging, passphrase: passphrase,
+                    isCancelled: { Task.isCancelled })
+            }
         } catch {
             await record(OperationFailure(url: archive, message: error.localizedDescription))
             return

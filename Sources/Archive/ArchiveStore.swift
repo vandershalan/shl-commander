@@ -30,16 +30,19 @@ final class ArchiveStore {
         let stamp = Self.stamp(for: archive)
         if let cached = indexes[stamp] { return cached }
 
-        let index = try await Self.read(archive)
+        let index = try await ArchivePassphrase.retrying(on: archive) {
+            try Self.read(archive, passphrase: $0)
+        }
         // Drop any older listing of the same file, so the cache does not grow with every save.
         indexes = indexes.filter { $0.key.path != stamp.path }
         indexes[stamp] = index
         return index
     }
 
-    /// `nonisolated async` so the subprocess and parsing run off the main actor.
-    private nonisolated static func read(_ archive: URL) async throws -> ArchiveIndex {
-        try ArchiveReader.index(of: archive)
+    /// `nonisolated` so the subprocess and parsing run off the main actor.
+    private nonisolated static func read(_ archive: URL, passphrase: String?) throws -> ArchiveIndex
+    {
+        try ArchiveReader.index(of: archive, passphrase: passphrase)
     }
 
     func invalidate(_ archive: URL) {
@@ -65,7 +68,9 @@ final class ArchiveStore {
             return destination
         }
 
-        try await Self.extract(member: member, from: archive, to: directory)
+        try await ArchivePassphrase.retrying(on: archive) {
+            try Self.extract(member: member, from: archive, to: directory, passphrase: $0)
+        }
         materialised[stamp, default: []].insert(member)
         return destination
     }
@@ -73,9 +78,11 @@ final class ArchiveStore {
     private nonisolated static func extract(
         member: String,
         from archive: URL,
-        to directory: URL
-    ) async throws {
-        try ArchiveReader.extract(members: [member], from: archive, to: directory)
+        to directory: URL,
+        passphrase: String?
+    ) throws {
+        try ArchiveReader.extract(
+            members: [member], from: archive, to: directory, passphrase: passphrase)
     }
 
     // MARK: - Scratch area

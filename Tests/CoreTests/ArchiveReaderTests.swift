@@ -46,6 +46,13 @@ struct ArchiveFixture {
         return url
     }
 
+    /// `zip -P`, a zip whose entry data is encrypted while its listing stays readable.
+    func makeEncryptedZip(password: String, named name: String = "secret.zip") throws -> URL {
+        let url = tree.root.appendingPathComponent(name)
+        try run("/usr/bin/zip", ["-qr", "-P", password, url.path, "."])
+        return url
+    }
+
     func makeTarGzip() throws -> URL {
         let url = tree.root.appendingPathComponent("test.tar.gz")
         try run("/usr/bin/tar", ["-czf", url.path, "."])
@@ -433,5 +440,95 @@ struct ArchiveReaderExtractionTests {
             try ArchiveReader.extract(
                 members: ["readme.txt"], from: archive, to: out, isCancelled: { true })
         }
+    }
+}
+
+
+@Suite("ArchiveReader passwords")
+struct ArchiveReaderPasswordTests {
+    @Test("the password goes in as an option, ahead of any member patterns")
+    func placesPassphrase() {
+        #expect(
+            ArchiveReader.withPassphrase(["-tvf", "/tmp/a.zip"], "hunter2")
+                == ["-tvf", "/tmp/a.zip", "--passphrase", "hunter2"])
+        #expect(
+            ArchiveReader.withPassphrase(["-xf", "/tmp/a.zip", "-C", "/tmp/out", "readme.txt"], nil)
+                == [
+                    "-xf", "/tmp/a.zip", "--passphrase", ArchiveReader.placeholderPassphrase,
+                    "-C", "/tmp/out", "readme.txt",
+                ],
+            "a placeholder stands in for the password, so bsdtar fails instead of prompting")
+    }
+
+    @Test("libarchive's two wordings both read as a password problem")
+    func recognisesMessages() {
+        #expect(ArchiveReader.mentionsPassphrase("readme.txt: Incorrect passphrase"))
+        #expect(ArchiveReader.mentionsPassphrase("Passphrase required for this entry"))
+        #expect(ArchiveReader.mentionsPassphrase("tar: Unrecognized archive format") == false)
+    }
+
+    @Test("an encrypted zip still lists without a password")
+    func listsWithoutPassword() throws {
+        let fixture = try ArchiveFixture("password-list")
+        defer { fixture.remove() }
+        let archive = try fixture.makeEncryptedZip(password: "hunter2")
+
+        // Only the entry data is encrypted in a zip, so browsing one costs nothing — which is
+        // why the password is asked for at the moment a file is actually read out.
+        let index = try ArchiveReader.index(of: archive)
+        #expect(index.members.contains { $0.path == "readme.txt" })
+    }
+
+    @Test("extracting from an encrypted zip needs the password")
+    func extractsWithPassword() throws {
+        let fixture = try ArchiveFixture("password-extract")
+        defer { fixture.remove() }
+        let archive = try fixture.makeEncryptedZip(password: "hunter2")
+        let out = try fixture.tree.directory("out")
+
+        try ArchiveReader.extract(
+            members: ["readme.txt"], from: archive, to: out, passphrase: "hunter2")
+        #expect(
+            FileManager.default.fileExists(
+                atPath: out.appendingPathComponent("readme.txt").path))
+    }
+
+    @Test("no password, and a wrong one, both come back as a password failure")
+    func reportsMissingAndWrongPassword() throws {
+        let fixture = try ArchiveFixture("password-wrong")
+        defer { fixture.remove() }
+        let archive = try fixture.makeEncryptedZip(password: "hunter2")
+        let out = try fixture.tree.directory("out")
+
+        // Both cases must arrive as `.passphraseNeeded`: that is what makes the app ask for a
+        // password rather than report an opaque tool failure. bsdtar does leave the entry behind
+        // as an empty file, which is why the staging directory it extracts into is thrown away.
+        for attempt: String? in [nil, "wrong"] {
+            var reported: ArchiveReader.Failure?
+            do {
+                try ArchiveReader.extract(
+                    members: ["readme.txt"], from: archive, to: out, passphrase: attempt)
+            } catch let failure as ArchiveReader.Failure {
+                reported = failure
+            }
+            guard case .passphraseNeeded = try #require(reported) else {
+                Issue.record("expected a password failure, got \(String(describing: reported))")
+                return
+            }
+        }
+    }
+
+    @Test("a password handed to an archive that has none is harmless")
+    func ignoresUnneededPassword() throws {
+        let fixture = try ArchiveFixture("password-unneeded")
+        defer { fixture.remove() }
+        let archive = try fixture.makeZip()
+        let out = try fixture.tree.directory("out")
+
+        try ArchiveReader.extract(
+            members: ["readme.txt"], from: archive, to: out, passphrase: "hunter2")
+        #expect(
+            FileManager.default.fileExists(
+                atPath: out.appendingPathComponent("readme.txt").path))
     }
 }

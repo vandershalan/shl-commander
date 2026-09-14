@@ -22,19 +22,15 @@ enum RowContextMenu {
             return menu
         }
 
-        let urls = targets.map(\.url)
-        let openable = targets.allSatisfy { !$0.isArchiveMember }
         let single = targets.count == 1 ? targets[0] : nil
 
         add(.openCursor, to: menu, panel: panel, targets: targets, state: state)
 
-        // Archive members have no path on disk, so there is nothing another app could be
-        // handed; F5 is what gets them out.
-        if openable {
-            let openWith = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
-            openWith.submenu = openWithMenu(for: urls, state: state)
-            menu.addItem(openWith)
-        }
+        // Archive members are offered too: they are pulled out to a read-only scratch copy
+        // when the app is chosen, which is what opening one has always meant here.
+        let openWith = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
+        openWith.submenu = openWithMenu(for: targets)
+        menu.addItem(openWith)
 
         menu.addItem(.separator())
         add(.quickLook, to: menu, panel: panel, targets: targets, state: state)
@@ -101,7 +97,7 @@ enum RowContextMenu {
         menu.addItem(.separator())
 
         let openWith = NSMenuItem(title: "Open This Folder With", action: nil, keyEquivalent: "")
-        openWith.submenu = openWithMenu(for: [panel.directory], state: state)
+        openWith.submenu = openWithMenu(forFolder: panel.directory)
         menu.addItem(openWith)
         add(.openInTerminal, to: menu, panel: panel, targets: [], state: state)
         add(.revealInFinder, to: menu, panel: panel, targets: [], state: state)
@@ -113,8 +109,20 @@ enum RowContextMenu {
         add(.refresh, to: menu, panel: panel, targets: [], state: state)
     }
 
+    /// The pane's own folder, which is a plain URL rather than a row.
+    private static func openWithMenu(forFolder folder: URL) -> NSMenu {
+        build(candidatesFor: [folder]) { AppOpener.open([folder], with: $0) }
+    }
+
     /// System suggestions first, then the apps the user has picked before, then "Other…".
-    private static func openWithMenu(for urls: [URL], state: AppState) -> NSMenu {
+    private static func openWithMenu(for targets: [FileEntry]) -> NSMenu {
+        build(candidatesFor: targets.map(\.url)) { AppOpener.open(targets, with: $0) }
+    }
+
+    private static func build(
+        candidatesFor urls: [URL],
+        open: @escaping (URL) -> Void
+    ) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let candidates = AppOpener.candidates(for: urls)
@@ -129,7 +137,7 @@ enum RowContextMenu {
         for app in candidates {
             let isDefault = app.path == systemDefault?.path
             let entry = item(isDefault ? "\(app.name) (default)" : app.name) {
-                AppOpener.open(urls, with: app.url)
+                open(app.url)
             }
             entry.toolTip = app.path
             menu.addItem(entry)
@@ -139,7 +147,7 @@ enum RowContextMenu {
         menu.addItem(
             item("Other…") {
                 guard let application = AppOpener.chooseApplication() else { return }
-                AppOpener.open(urls, with: application)
+                open(application)
             })
         return menu
     }
