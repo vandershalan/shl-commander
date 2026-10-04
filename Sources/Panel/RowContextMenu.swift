@@ -43,6 +43,10 @@ enum RowContextMenu {
         add(.getInfo, to: menu, panel: panel, targets: targets, state: state)
 
         menu.addItem(.separator())
+        add(.cutToClipboard, to: menu, panel: panel, targets: targets, state: state)
+        add(.copyToClipboard, to: menu, panel: panel, targets: targets, state: state)
+
+        menu.addItem(.separator())
         add(.copyToOtherPane, to: menu, panel: panel, targets: targets, state: state)
         add(.moveToOtherPane, to: menu, panel: panel, targets: targets, state: state)
         add(.duplicate, to: menu, panel: panel, targets: targets, state: state)
@@ -94,6 +98,7 @@ enum RowContextMenu {
     ) {
         add(.newFolder, to: menu, panel: panel, targets: [], state: state)
         add(.newFile, to: menu, panel: panel, targets: [], state: state)
+        add(.pasteFromClipboard, to: menu, panel: panel, targets: [], state: state)
         menu.addItem(.separator())
 
         let openWith = NSMenuItem(title: "Open This Folder With", action: nil, keyEquivalent: "")

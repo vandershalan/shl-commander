@@ -62,7 +62,13 @@ extension Keymap {
         .editFile: [chord("f4"), chord("cmd+e")],
         .newFolder: [chord("f7"), chord("cmd+shift+n")],
         .newFile: [chord("shift+f4"), chord("cmd+shift+f")],
-        .copyToOtherPane: [chord("f5"), chord("cmd+c")],
+        // ⌘C / ⌘X / ⌘V are the system clipboard, as everywhere else on the Mac. ⌘⌥V moves
+        // what was copied, the way the Finder does it.
+        .copyToClipboard: [chord("cmd+c")],
+        .cutToClipboard: [chord("cmd+x")],
+        .pasteFromClipboard: [chord("cmd+v")],
+        .pasteMoving: [chord("cmd+opt+v")],
+        .copyToOtherPane: [chord("f5"), chord("cmd+shift+c")],
         .moveToOtherPane: [chord("f6"), chord("cmd+m")],
         .duplicate: [chord("shift+f5"), chord("cmd+d")],
         .renameInPlace: [chord("shift+f6"), chord("cmd+return")],

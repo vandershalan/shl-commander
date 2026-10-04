@@ -232,7 +232,7 @@ struct RowContextMenuTests {
             row: try row(panel, named: "alpha.txt"), panel: panel, state: state)
         let copy = try #require(menu.items.first { $0.title == Command.copyToOtherPane.title })
         #expect(copy.keyEquivalent == "c")
-        #expect(copy.keyEquivalentModifierMask == .command)
+        #expect(copy.keyEquivalentModifierMask == [.command, .shift])
     }
 
     @Test("Open With lists something, and always offers Other…")

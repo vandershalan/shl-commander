@@ -134,7 +134,9 @@ setting. Holding `fn` works too.
 | View as text / hex | `⌥F3` | `⌘⇧Y` |
 | Edit | `F4` | `⌘E` |
 | New folder / new file | `F7` / `⇧F4` | `⌘⇧N` / `⌘⇧F` |
-| Copy / move to other pane | `F5` / `F6` | `⌘C` / `⌘M` |
+| Copy / cut / paste (system clipboard) | | `⌘C` / `⌘X` / `⌘V` |
+| Move copied items here (as in the Finder) | | `⌘⌥V` |
+| Copy / move to other pane | `F5` / `F6` | `⌘⇧C` / `⌘M` |
 | Duplicate | `⇧F5` | `⌘D` |
 | Rename in place | `⇧F6` | `⌘Return` |
 | Move to Trash | `F8` | `⌘⌫` |

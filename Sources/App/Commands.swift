@@ -8,10 +8,10 @@ struct MainCommands: Commands {
     private var dispatcher: CommandDispatcher { CommandDispatcher(state: state) }
 
     var body: some Commands {
-        // SwiftUI's stock Edit menu claims ⌘A for Select All and ⌘C for Copy, which are the
-        // natural bindings for Mark All and Copy here. Menus win key equivalents before a
-        // view ever sees the event, so the defaults are removed rather than shadowed.
-        CommandGroup(replacing: .pasteboard) {}
+        // SwiftUI's stock Edit menu claims ⌘A for Select All and ⌘C/⌘X/⌘V for text. Menus win
+        // key equivalents before a view ever sees the event, so the stock items are replaced
+        // with the file clipboard's — which hand off to a text field when one is being edited.
+        CommandGroup(replacing: .pasteboard) { items(in: .edit) }
         CommandGroup(replacing: .undoRedo) {}
         CommandGroup(replacing: .newItem) {}
         // Sidebar and toolbar commands are not removable this way — replacing them with an

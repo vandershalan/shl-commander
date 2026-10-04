@@ -28,6 +28,16 @@ struct CommandDispatcher {
         case .editFile:
             edit(panel)
 
+        // Clipboard
+        case .copyToClipboard:
+            copyToClipboard(panel, cutting: false)
+        case .cutToClipboard:
+            copyToClipboard(panel, cutting: true)
+        case .pasteFromClipboard:
+            paste(into: panel, forcingMove: false)
+        case .pasteMoving:
+            paste(into: panel, forcingMove: true)
+
         // File operations
         case .newFolder:
             createItem(on: panel, directory: true)
@@ -318,6 +328,89 @@ struct CommandDispatcher {
             report([OperationFailure(url: url, message: error.localizedDescription)])
             return nil
         }
+    }
+
+    // MARK: - Clipboard
+
+    /// Puts the targets on the system pasteboard. A cut only marks them: the sources stay where
+    /// they are until a paste moves them, so a cut that is never pasted costs nothing.
+    private func copyToClipboard(_ panel: PanelViewModel, cutting: Bool) {
+        // The menu owns ⌘C / ⌘X ahead of any text field, so a field being edited gets them
+        // handed back here.
+        if forwardToTextEditor(cutting ? #selector(NSText.cut(_:)) : #selector(NSText.copy(_:))) {
+            return
+        }
+        let targets = panel.actionTargets
+        guard !targets.isEmpty else { return }
+
+        guard panel.isInsideArchive else {
+            let urls = targets.map(\.url)
+            if cutting { state.clipboard.cut(urls) } else { state.clipboard.copy(urls) }
+            return
+        }
+        // Members have no file of their own, so the clipboard gets extracted copies — which
+        // can be copied anywhere, but not cut out of an archive that is read-only.
+        guard !cutting else {
+            refuseArchiveWrite()
+            return
+        }
+        Task { [state] in
+            guard let urls = await materialise(targets, reportingTo: panel) else { return }
+            state.clipboard.copy(urls)
+        }
+    }
+
+    /// Pastes into the pane's folder without asking, as the Finder does; collisions still go
+    /// through the conflict dialog.
+    private func paste(into panel: PanelViewModel, forcingMove: Bool) {
+        if !forcingMove, forwardToTextEditor(#selector(NSText.paste(_:))) { return }
+        guard !state.operations.isRunning,
+            let contents = state.clipboard.contents()
+        else { return }
+        guard !panel.isInsideArchive else {
+            refuseArchiveWrite()
+            return
+        }
+
+        let destination = panel.directory
+        let target = destination.standardizedFileURL.path
+        if let folder = contents.urls.first(where: {
+            let source = $0.standardizedFileURL.path
+            return target == source || target.hasPrefix(source + "/")
+        }) {
+            report([
+                OperationFailure(url: folder, message: "A folder cannot be pasted inside itself.")
+            ])
+            return
+        }
+
+        let kind: FileOperationKind = contents.isCut || forcingMove ? .move : .copy
+        var request = FileOperationRequest(
+            kind: kind, sources: contents.urls, destinationDirectory: destination)
+
+        if kind == .move {
+            // Moving something into the folder it already sits in is not an operation.
+            let sources = contents.urls.filter {
+                $0.deletingLastPathComponent().standardizedFileURL
+                    != destination.standardizedFileURL
+            }
+            guard !sources.isEmpty else { return }
+            request = FileOperationRequest(
+                kind: kind, sources: sources, destinationDirectory: destination)
+            state.clipboard.finishCut()
+        } else if FileTableController.allSit(in: destination, contents.urls) {
+            // Pasting a copy back where it came from is a duplicate, as in the Finder.
+            request.automaticResolution = .rename
+        }
+
+        state.operationSheet.showRunning()
+        state.operations.start(request, prompt: SheetConflictPrompt(model: state.operationSheet))
+    }
+
+    /// Sends a standard edit action to the text field being edited, if there is one.
+    private func forwardToTextEditor(_ action: Selector) -> Bool {
+        guard NSApp.keyWindow?.firstResponder is NSTextView else { return false }
+        return NSApp.sendAction(action, to: nil, from: nil)
     }
 
     // MARK: - Packing

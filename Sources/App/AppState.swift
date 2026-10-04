@@ -36,6 +36,9 @@ final class AppState {
 
     let favorites = FavoritesStore()
 
+    /// ⌘C / ⌘X / ⌘V for files.
+    let clipboard: FileClipboard
+
     /// Outlives the pop-up favourites menu, which needs an NSObject target.
     let favoriteMenuTarget = FavoriteMenuTarget()
 
@@ -47,12 +50,14 @@ final class AppState {
         left: URL = FileManager.default.homeDirectoryForCurrentUser,
         right: URL = FileManager.default.homeDirectoryForCurrentUser,
         keymap: Keymap = .loadFromDisk(),
-        settings: AppSettings = .shared
+        settings: AppSettings = .shared,
+        clipboard: FileClipboard = FileClipboard()
     ) {
         self.left = PanelViewModel(directory: left)
         self.right = PanelViewModel(directory: right)
         self.keymap = keymap
         self.settings = settings
+        self.clipboard = clipboard
     }
 
     func panel(_ side: Side) -> PanelViewModel {

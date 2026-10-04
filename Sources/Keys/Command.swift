@@ -13,6 +13,12 @@ enum Command: String, CaseIterable, Codable, Sendable {
     case viewInternal
     case editFile
 
+    // Clipboard
+    case copyToClipboard
+    case cutToClipboard
+    case pasteFromClipboard
+    case pasteMoving
+
     // File operations
     case newFolder
     case newFile
@@ -98,8 +104,12 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .editFile: return "Edit"
         case .newFolder: return "New Folder…"
         case .newFile: return "New File…"
-        case .copyToOtherPane: return "Copy…"
-        case .moveToOtherPane: return "Move…"
+        case .copyToClipboard: return "Copy"
+        case .cutToClipboard: return "Cut"
+        case .pasteFromClipboard: return "Paste"
+        case .pasteMoving: return "Move Items Here"
+        case .copyToOtherPane: return "Copy to Other Pane…"
+        case .moveToOtherPane: return "Move to Other Pane…"
         case .duplicate: return "Duplicate"
         case .renameInPlace: return "Rename"
         case .moveToTrash: return "Move to Trash"
@@ -175,6 +185,8 @@ enum Command: String, CaseIterable, Codable, Sendable {
             return .favorites
         case .showShortcuts:
             return .help
+        case .copyToClipboard, .cutToClipboard, .pasteFromClipboard, .pasteMoving:
+            return .edit
         case .quickLook, .viewInternal, .editFile,
             .newFolder, .newFile, .copyToOtherPane, .moveToOtherPane, .duplicate,
             .renameInPlace, .moveToTrash, .deletePermanently, .openInTerminal, .revealInFinder,
@@ -201,7 +213,10 @@ enum Command: String, CaseIterable, Codable, Sendable {
     }
 
     enum Section: String, CaseIterable, Sendable {
-        case file, mark, go, view, panes, favorites
+        case file
+        /// Rides the standard Edit menu, where ⌘C / ⌘X / ⌘V are looked for.
+        case edit
+        case mark, go, view, panes, favorites
         /// Rides the standard Help menu rather than getting a menu of its own, which would
         /// leave two menus called Help in the bar.
         case help
@@ -209,6 +224,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
         var title: String {
             switch self {
             case .file: return "File"
+            case .edit: return "Edit"
             case .mark: return "Mark"
             case .go: return "Go"
             case .view: return "View"
