@@ -11,6 +11,7 @@ struct FileTableView: NSViewRepresentable {
     let listingID: UUID
     let cursor: Int
     let marks: Set<URL>
+    let cutURLs: Set<URL>
     let directorySizes: [URL: Int64]
     let measuringDirectories: Set<URL>
     let sort: SortOrder
@@ -131,15 +132,18 @@ struct FileTableView: NSViewRepresentable {
             controller.listingID = listingID
             controller.entries = entries
             controller.marks = marks
+            controller.cutURLs = cutURLs
             controller.directorySizes = directorySizes
             controller.measuringDirectories = measuringDirectories
             controller.reloadRows(on: table)
         } else if controller.marks != marks
+            || controller.cutURLs != cutURLs
             || controller.directorySizes != directorySizes
             || controller.measuringDirectories != measuringDirectories
         {
             // Marks and sizes repaint in place; the row set has not changed.
             controller.marks = marks
+            controller.cutURLs = cutURLs
             controller.directorySizes = directorySizes
             controller.measuringDirectories = measuringDirectories
             table.reloadData(

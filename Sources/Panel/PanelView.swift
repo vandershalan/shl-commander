@@ -7,6 +7,8 @@ struct PanelView: View {
     let volumes: VolumeService
     let cloud: CloudService
     let isActive: Bool
+    /// Files cut to the clipboard, drawn dimmed until they are pasted.
+    let cutURLs: Set<URL>
     /// Opens the Connect to Server window, which belongs to no one pane.
     let onConnectToServer: () -> Void
     /// Files dropped on this pane, and where they should land.
@@ -32,6 +34,7 @@ struct PanelView: View {
                 listingID: panel.listingID,
                 cursor: panel.cursor,
                 marks: panel.marks,
+                cutURLs: cutURLs,
                 directorySizes: panel.sizer.sizes,
                 measuringDirectories: panel.measuringDirectories,
                 sort: panel.sort,

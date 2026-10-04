@@ -1,4 +1,5 @@
 import AppKit
+import Observation
 
 /// Files on the system pasteboard, the way ⌘C / ⌘X / ⌘V work in the Finder and everywhere else.
 ///
@@ -11,6 +12,7 @@ import AppKit
 /// Nothing is removed at cut time: the sources only go when the paste moves them, so a cut that
 /// is never pasted loses nothing.
 @MainActor
+@Observable
 final class FileClipboard {
     struct Contents: Equatable {
         let urls: [URL]
@@ -18,26 +20,47 @@ final class FileClipboard {
         let isCut: Bool
     }
 
-    private let pasteboard: NSPasteboard
-    private var cutChangeCount: Int?
+    /// The files waiting to be moved, so the panes can draw them dimmed the way the Finder
+    /// and Explorer show a pending cut. Empty once the cut is pasted or superseded.
+    private(set) var cutURLs: Set<URL> = []
+
+    @ObservationIgnored private let pasteboard: NSPasteboard
+    @ObservationIgnored private var cutChangeCount: Int?
+    @ObservationIgnored private var activationObserver: (any NSObjectProtocol)?
 
     /// Injectable so tests can use a private pasteboard instead of the user's clipboard.
     init(pasteboard: NSPasteboard = .general) {
         self.pasteboard = pasteboard
+        // Another app can only replace the clipboard while this one is in the background, so
+        // coming back to the front is when a superseded cut has to stop looking cut.
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.forgetStaleCut() }
+        }
+    }
+
+    isolated deinit {
+        if let activationObserver {
+            NotificationCenter.default.removeObserver(activationObserver)
+        }
     }
 
     func copy(_ urls: [URL]) {
         write(urls)
         cutChangeCount = nil
+        cutURLs = []
     }
 
     func cut(_ urls: [URL]) {
         write(urls)
         cutChangeCount = pasteboard.changeCount
+        cutURLs = Set(urls)
     }
 
     /// The files waiting to be pasted, or nil when the pasteboard holds none.
     func contents() -> Contents? {
+        forgetStaleCut()
         let urls = FileTableController.fileURLs(on: pasteboard)
         guard !urls.isEmpty else { return nil }
         return Contents(urls: urls, isCut: cutChangeCount == pasteboard.changeCount)
@@ -49,6 +72,14 @@ final class FileClipboard {
         guard cutChangeCount == pasteboard.changeCount else { return }
         pasteboard.clearContents()
         cutChangeCount = nil
+        cutURLs = []
+    }
+
+    /// Drops the cut once something else has been put on the pasteboard.
+    func forgetStaleCut() {
+        guard let cutChangeCount, cutChangeCount != pasteboard.changeCount else { return }
+        self.cutChangeCount = nil
+        cutURLs = []
     }
 
     private func write(_ urls: [URL]) {

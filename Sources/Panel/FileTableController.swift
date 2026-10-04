@@ -136,6 +136,7 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
     var entries: [FileEntry] = []
     var listingID: UUID?
     var marks: Set<URL> = []
+    var cutURLs: Set<URL> = []
     var directorySizes: [URL: Int64] = [:]
     var measuringDirectories: Set<URL> = []
 
@@ -220,10 +221,17 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
         }
 
         let isMarked = marks.contains(entry.url)
-        cell.textField?.textColor = Self.color(for: entry, column: column, marked: isMarked)
+        let color = Self.color(for: entry, column: column, marked: isMarked)
+        // A pending cut fades the whole row, icon included, as the Finder and Explorer do. The
+        // fade sits on top of the usual colour so a marked row still reads as marked.
+        let isCut = cutURLs.contains(entry.url)
+        cell.textField?.textColor = isCut ? color.withAlphaComponent(Self.cutAlpha) : color
+        cell.imageView?.alphaValue = isCut ? Self.cutAlpha : 1
         cell.textField?.font = font(for: column, entry: entry, marked: isMarked)
         return cell
     }
+
+    private static let cutAlpha: CGFloat = 0.4
 
     /// Marked rows go red across every column, which is how Total Commander signals them.
     /// Hidden and symlinked rows are dimmed; everything else uses the label color so

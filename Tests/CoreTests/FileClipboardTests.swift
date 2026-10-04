@@ -66,6 +66,27 @@ struct FileClipboardTests {
         #expect(clipboard.contents()?.isCut == false)
     }
 
+    @Test("cut files are tracked for dimming until copied over or pasted")
+    func cutURLsFollowTheCut() {
+        let board = pasteboard()
+        let clipboard = FileClipboard(pasteboard: board)
+        let url = URL(fileURLWithPath: "/tmp/x.txt")
+
+        clipboard.cut([url])
+        #expect(clipboard.cutURLs == [url])
+        clipboard.copy([url])
+        #expect(clipboard.cutURLs.isEmpty, "a copy replaces the cut")
+
+        clipboard.cut([url])
+        board.clearContents()
+        clipboard.forgetStaleCut()
+        #expect(clipboard.cutURLs.isEmpty, "another app took the clipboard")
+
+        clipboard.cut([url])
+        clipboard.finishCut()
+        #expect(clipboard.cutURLs.isEmpty)
+    }
+
     @Test("an empty pasteboard has nothing to paste")
     func emptyPasteboard() {
         #expect(FileClipboard(pasteboard: pasteboard()).contents() == nil)

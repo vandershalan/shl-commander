@@ -123,6 +123,7 @@ struct MainWindow: View {
                     volumes: state.volumes,
                     cloud: state.cloud,
                     isActive: state.active == .left,
+                    cutURLs: state.clipboard.cutURLs,
                     onConnectToServer: { connectToServer() },
                     onDrop: accept(drop:to:copying:),
                     onContextMenu: { row in
@@ -140,6 +141,7 @@ struct MainWindow: View {
                     volumes: state.volumes,
                     cloud: state.cloud,
                     isActive: state.active == .right,
+                    cutURLs: state.clipboard.cutURLs,
                     onConnectToServer: { connectToServer() },
                     onDrop: accept(drop:to:copying:),
                     onContextMenu: { row in
