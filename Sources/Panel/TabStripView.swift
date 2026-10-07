@@ -68,7 +68,7 @@ struct TabStripView: View {
                     // off from the path bar it belongs to.
                     OpenTabOutline(radius: 5)
                         .stroke(
-                            isActive ? Color.accentColor : Color.secondary.opacity(0.7),
+                            isActive ? Color.activeOutline : Color.secondary.opacity(0.5),
                             lineWidth: 1.5
                         )
                 } else {

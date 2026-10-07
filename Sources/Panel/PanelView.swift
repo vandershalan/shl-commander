@@ -102,7 +102,7 @@ struct PanelView: View {
         // The active pane is outlined rather than tinted so file colours stay honest.
         .overlay(
             Rectangle()
-                .strokeBorder(isActive ? Color.accentColor : Color.clear, lineWidth: 2)
+                .strokeBorder(isActive ? Color.activeOutline : Color.clear, lineWidth: 2)
         )
         .contentShape(Rectangle())
         .onTapGesture { onActivate() }
@@ -236,4 +236,10 @@ struct PanelView: View {
             + Formatters.size(panel.markedBytes) + " of " + Formatters.size(panel.totalBytes)
     }
 
+}
+
+extension Color {
+    /// Outline of the active pane and its selected tab: light grey, so it marks focus without
+    /// competing with the folder colours.
+    static let activeOutline = Color(nsColor: .lightGray)
 }
