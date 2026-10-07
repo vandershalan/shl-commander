@@ -64,6 +64,7 @@ struct MainWindow: View {
         return HStack(spacing: 8) {
             FavoritesBarView(
                 store: state.favorites,
+                colors: state.pathColors,
                 onOpen: { dispatcher.open($0) },
                 onAddCurrent: { dispatcher.perform(.addFavorite) }
             )
@@ -122,6 +123,7 @@ struct MainWindow: View {
                     panel: state.left,
                     volumes: state.volumes,
                     cloud: state.cloud,
+                    pathColors: state.pathColors,
                     isActive: state.active == .left,
                     cutURLs: state.clipboard.cutURLs,
                     onConnectToServer: { connectToServer() },
@@ -140,6 +142,7 @@ struct MainWindow: View {
                     panel: state.right,
                     volumes: state.volumes,
                     cloud: state.cloud,
+                    pathColors: state.pathColors,
                     isActive: state.active == .right,
                     cutURLs: state.clipboard.cutURLs,
                     onConnectToServer: { connectToServer() },

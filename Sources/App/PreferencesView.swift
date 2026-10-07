@@ -12,6 +12,8 @@ struct PreferencesView: View {
                 .tabItem { Label("General", systemImage: "gearshape") }
             KeyboardPreferences(state: state)
                 .tabItem { Label("Keyboard", systemImage: "keyboard") }
+            PathColorsPreferences(state: state)
+                .tabItem { Label("Colours", systemImage: "paintpalette") }
         }
         // Stock controls size themselves off the font they inherit, so one font and one frame
         // is all this window needs to follow the zoom.

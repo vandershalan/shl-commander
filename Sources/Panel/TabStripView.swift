@@ -2,8 +2,12 @@ import SwiftUI
 
 /// Tabs for one pane. Hidden while a pane has a single tab, so the common case costs no
 /// vertical space.
+///
+/// Drawn as folder tabs sitting on the path bar: the selected one shares the bar's fill and
+/// has no bottom edge, so it reads as the same shape; each tab takes the colour of its folder.
 struct TabStripView: View {
     let panel: PanelViewModel
+    let colors: PathColorStore
     let isActive: Bool
     let onActivate: () -> Void
 
@@ -11,19 +15,24 @@ struct TabStripView: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: scale(4)) {
+            HStack(alignment: .bottom, spacing: scale(2)) {
                 ForEach(Array(panel.tabs.enumerated()), id: \.element.id) { index, tab in
                     tabButton(tab, index: index)
                 }
             }
             .padding(.horizontal, scale(4))
         }
-        .frame(height: scale(22))
+        .frame(height: scale(22), alignment: .bottom)
         .background(Color(nsColor: .underPageBackgroundColor))
     }
 
     private func tabButton(_ tab: PanelTab, index: Int) -> some View {
         let selected = index == panel.activeTabIndex
+        // The selected tab's stored path lags behind navigation until it is captured, so it
+        // follows the live directory instead.
+        let path = selected ? panel.directory.path : tab.path
+        let shape = UnevenRoundedRectangle(topLeadingRadius: 5, topTrailingRadius: 5)
+
         return Button {
             onActivate()
             panel.selectTab(index)
@@ -45,19 +54,20 @@ struct TabStripView: View {
                     .help("Close tab")
                 }
             }
-            .padding(.horizontal, scale(7))
-            .padding(.vertical, scale(2))
+            .padding(.horizontal, scale(8))
+            .frame(height: scale(selected ? 20 : 18))
+            // Layered on the pane's own background, exactly as the path bar is, so a
+            // translucent fill comes out the same colour in both places.
             .background(
-                selected
-                    ? (isActive ? Color.accentColor.opacity(0.30) : Color.secondary.opacity(0.20))
-                    : Color.secondary.opacity(0.08),
-                in: RoundedRectangle(cornerRadius: 4)
+                colors.barFill(for: path, isActive: selected && isActive), in: shape
             )
-            // Outline every tab so neighbouring inactive tabs don't read as one line of text.
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Color.secondary.opacity(selected ? 0 : 0.30), lineWidth: 1)
-            )
+            .background(Color(nsColor: .controlBackgroundColor), in: shape)
+            .overlay {
+                if !selected {
+                    shape.strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1)
+                }
+            }
+            .contentShape(shape)
         }
         .buttonStyle(.plain)
         .help(tab.path)

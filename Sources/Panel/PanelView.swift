@@ -6,6 +6,7 @@ struct PanelView: View {
     let panel: PanelViewModel
     let volumes: VolumeService
     let cloud: CloudService
+    let pathColors: PathColorStore
     let isActive: Bool
     /// Files cut to the clipboard, drawn dimmed until they are pasted.
     let cutURLs: Set<URL>
@@ -24,8 +25,13 @@ struct PanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             if panel.hasMultipleTabs {
-                TabStripView(panel: panel, isActive: isActive, onActivate: onActivate)
-                Divider()
+                // No divider: the active tab runs straight into the path bar below it.
+                TabStripView(
+                    panel: panel,
+                    colors: pathColors,
+                    isActive: isActive,
+                    onActivate: onActivate
+                )
             }
             pathBar
             Divider()
@@ -125,7 +131,7 @@ struct PanelView: View {
         }
         .padding(.horizontal, scale(8))
         .frame(height: scale(24))
-        .background(isActive ? Color.accentColor.opacity(0.18) : Color.clear)
+        .background(pathColors.barFill(for: panel.directory.path, isActive: isActive))
     }
 
     /// Total Commander's drive buttons, condensed into one menu per pane — plus the places

@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 /// the buttons beside it share the same strip.
 struct FavoritesBarView: View {
     let store: FavoritesStore
+    let colors: PathColorStore
     /// Where a click should navigate to.
     let onOpen: (Favorite) -> Void
     let onAddCurrent: () -> Void
@@ -50,7 +51,11 @@ struct FavoritesBarView: View {
             }
             .padding(.horizontal, scale(7))
             .padding(.vertical, scale(2))
-            .background(Color.secondary.opacity(0.15), in: Capsule())
+            .background(
+                colors.color(for: favorite.path)?.color.opacity(0.5)
+                    ?? Color.secondary.opacity(0.15),
+                in: Capsule()
+            )
             // A folder that has been moved or deleted is dimmed rather than silently dead.
             .opacity(favorite.exists ? 1 : 0.45)
         }

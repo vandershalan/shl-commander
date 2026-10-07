@@ -34,7 +34,10 @@ final class AppState {
     /// OneDrive, iCloud Drive and friends: ordinary folders, listed beside the volumes.
     let cloud = CloudService()
 
-    let favorites = FavoritesStore()
+    let favorites: FavoritesStore
+
+    /// Colours for favourites, tabs and path bars, chosen by path fragment.
+    let pathColors: PathColorStore
 
     /// ⌘C / ⌘X / ⌘V for files.
     let clipboard: FileClipboard
@@ -58,6 +61,9 @@ final class AppState {
         self.keymap = keymap
         self.settings = settings
         self.clipboard = clipboard
+        let favorites = FavoritesStore()
+        self.favorites = favorites
+        self.pathColors = PathColorStore(seedingFrom: favorites.favorites)
     }
 
     func panel(_ side: Side) -> PanelViewModel {
