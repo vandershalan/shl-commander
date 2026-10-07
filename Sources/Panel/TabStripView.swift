@@ -63,7 +63,15 @@ struct TabStripView: View {
             )
             .background(Color(nsColor: .controlBackgroundColor), in: shape)
             .overlay {
-                if !selected {
+                if selected {
+                    // Open at the bottom, so the outline stands out without cutting the tab
+                    // off from the path bar it belongs to.
+                    OpenTabOutline(radius: 5)
+                        .stroke(
+                            isActive ? Color.accentColor : Color.secondary.opacity(0.7),
+                            lineWidth: 1.5
+                        )
+                } else {
                     shape.strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1)
                 }
             }
@@ -71,5 +79,32 @@ struct TabStripView: View {
         }
         .buttonStyle(.plain)
         .help(tab.path)
+    }
+}
+
+/// A tab's left, top and right edges with rounded top corners — no bottom edge.
+private struct OpenTabOutline: Shape {
+    let radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        // Inset by half a typical stroke so the line is not clipped at the frame's edge.
+        let r = rect.insetBy(dx: 0.75, dy: 0.75)
+        let radius = min(radius, r.width / 2, r.height)
+        var path = Path()
+        path.move(to: CGPoint(x: r.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: r.minX, y: r.minY + radius))
+        path.addArc(
+            tangent1End: CGPoint(x: r.minX, y: r.minY),
+            tangent2End: CGPoint(x: r.minX + radius, y: r.minY),
+            radius: radius
+        )
+        path.addLine(to: CGPoint(x: r.maxX - radius, y: r.minY))
+        path.addArc(
+            tangent1End: CGPoint(x: r.maxX, y: r.minY),
+            tangent2End: CGPoint(x: r.maxX, y: r.minY + radius),
+            radius: radius
+        )
+        path.addLine(to: CGPoint(x: r.maxX, y: rect.maxY))
+        return path
     }
 }
