@@ -11,7 +11,7 @@ struct TabStripView: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 2) {
+            HStack(spacing: scale(4)) {
                 ForEach(Array(panel.tabs.enumerated()), id: \.element.id) { index, tab in
                     tabButton(tab, index: index)
                 }
@@ -32,6 +32,7 @@ struct TabStripView: View {
                 Text(tab.title)
                     .font(.system(size: scale(11), weight: selected ? .semibold : .regular))
                     .lineLimit(1)
+                    .foregroundStyle(selected ? .primary : .secondary)
                 if selected, panel.hasMultipleTabs {
                     Button {
                         onActivate()
@@ -49,8 +50,13 @@ struct TabStripView: View {
             .background(
                 selected
                     ? (isActive ? Color.accentColor.opacity(0.30) : Color.secondary.opacity(0.20))
-                    : Color.clear,
+                    : Color.secondary.opacity(0.08),
                 in: RoundedRectangle(cornerRadius: 4)
+            )
+            // Outline every tab so neighbouring inactive tabs don't read as one line of text.
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(Color.secondary.opacity(selected ? 0 : 0.30), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
