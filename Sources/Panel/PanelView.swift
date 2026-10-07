@@ -102,7 +102,7 @@ struct PanelView: View {
         // The active pane is outlined rather than tinted so file colours stay honest.
         .overlay(
             Rectangle()
-                .strokeBorder(isActive ? Color.activeOutline : Color.clear, lineWidth: 2)
+                .strokeBorder(isActive ? Color.activeOutline : Color.clear, lineWidth: 1)
         )
         .contentShape(Rectangle())
         .onTapGesture { onActivate() }
