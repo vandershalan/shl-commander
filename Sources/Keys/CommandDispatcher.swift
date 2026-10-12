@@ -800,14 +800,18 @@ struct CommandDispatcher {
         state.inactivePanel.openTab(at: target)
     }
 
-    func open(_ favorite: Favorite) {
+    func open(_ favorite: Favorite, inNewTab: Bool = false) {
         guard favorite.exists else {
             report([
                 OperationFailure(url: favorite.url, message: "This folder no longer exists.")
             ])
             return
         }
-        state.activePanel.navigate(to: favorite.url)
+        if inNewTab {
+            state.activePanel.openTab(at: favorite.url)
+        } else {
+            state.activePanel.navigate(to: favorite.url)
+        }
     }
 
     private func addFavorite(_ url: URL) {

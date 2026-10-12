@@ -1,16 +1,17 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Favourite folders across the top of the window. Clicking one sends the active pane there;
-/// the first nine also answer to ⌘1–⌘9.
+/// Favourite folders across the top of the window. Clicking one opens it in a new tab of the
+/// active pane; ⌥-clicking sends the current tab there instead. The first nine also answer to
+/// ⌘1–⌘9, which navigate the current tab.
 ///
 /// Draws no background or fixed height of its own: `MainWindow` owns the bar it sits in, so
 /// the buttons beside it share the same strip.
 struct FavoritesBarView: View {
     let store: FavoritesStore
     let colors: PathColorStore
-    /// Where a click should navigate to.
-    let onOpen: (Favorite) -> Void
+    /// Where a click should navigate to, and whether it should open a new tab.
+    let onOpen: (Favorite, _ inNewTab: Bool) -> Void
     let onAddCurrent: () -> Void
 
     /// Favourite being dragged, so a drop knows what to move.
@@ -38,7 +39,10 @@ struct FavoritesBarView: View {
     }
 
     private func chip(_ favorite: Favorite, number: Int) -> some View {
-        Button { onOpen(favorite) } label: {
+        Button {
+            let replacing = NSEvent.modifierFlags.contains(.option)
+            onOpen(favorite, !replacing)
+        } label: {
             HStack(spacing: 4) {
                 if number <= 9 {
                     Text("\u{2318}\(number)")
@@ -60,7 +64,7 @@ struct FavoritesBarView: View {
             .opacity(favorite.exists ? 1 : 0.45)
         }
         .buttonStyle(.plain)
-        .help(favorite.path)
+        .help("\(favorite.path)\nClick: new tab \u{2014} \u{2325}-click: current tab")
         .contextMenu {
             Button("Rename…") { rename(favorite) }
             Button("Remove") { store.remove(favorite) }
