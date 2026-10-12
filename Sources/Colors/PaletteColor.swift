@@ -43,6 +43,20 @@ struct PaletteColor: RawRepresentable, Hashable, Sendable, Codable {
         )
     }
 
+    /// The colour scheme whose text reads on this colour as a solid fill: light text on dark
+    /// shades, dark text on light ones. Chosen by whichever of white or black contrasts more,
+    /// per WCAG relative luminance.
+    var textScheme: ColorScheme {
+        func linear(_ channel: UInt32) -> Double {
+            let value = Double(channel & 0xFF) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        let luminance =
+            0.2126 * linear(hex >> 16) + 0.7152 * linear(hex >> 8) + 0.0722 * linear(hex)
+        // Contrast with white equals contrast with black at L ≈ 0.179.
+        return luminance < 0.179 ? .dark : .light
+    }
+
     // MARK: - Palette
 
     static let hues = [

@@ -54,11 +54,12 @@ struct FavoritesBarView: View {
                 .font(.system(size: scale(11)))
                 .lineLimit(1)
         }
+        // Solid, matching the swatch in Preferences, with text light or dark to suit.
+        .textScheme(colors.color(for: favorite.path)?.textScheme)
         .padding(.horizontal, scale(7))
         .padding(.vertical, scale(2))
         .background(
-            colors.color(for: favorite.path)?.color.opacity(0.5)
-                ?? Color.secondary.opacity(0.15),
+            colors.color(for: favorite.path)?.color ?? Color.secondary.opacity(0.15),
             in: Capsule()
         )
         // A folder that has been moved or deleted is dimmed rather than silently dead.
