@@ -185,6 +185,27 @@ struct CommandDispatcherTests {
         #expect(f.state.left.filter.isEmpty)
     }
 
+    @Test("Escape clears the filter first, then the marks")
+    func escapeClearsFilterThenMarks() async throws {
+        let f = try await fixture()
+        defer { f.remove() }
+        let panel = f.state.left
+
+        panel.markAll()
+        let marked = panel.marks
+        #expect(!marked.isEmpty)
+        panel.setFilter("a")
+
+        f.dispatcher.perform(.clearFilter)
+        #expect(panel.filter.isEmpty)
+        #expect(panel.marks == marked, "the first Escape only clears the filter")
+
+        #expect(f.dispatcher.isEnabled(.clearFilter))
+        f.dispatcher.perform(.clearFilter)
+        #expect(panel.marks.isEmpty)
+        #expect(f.dispatcher.isEnabled(.clearFilter) == false)
+    }
+
     @Test("goUp is disabled at the volume root")
     func goUpEnablement() async throws {
         let f = try await fixture()

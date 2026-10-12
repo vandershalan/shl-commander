@@ -177,7 +177,7 @@ setting. Holding `fn` works too.
 | Open in Terminal | | `⌘⇧T` |
 | Reveal in Finder | | `⌘⇧R` |
 | Copy path | `⌃⇧Return` | `⌘⌥C` |
-| Clear filter | `Esc` | |
+| Clear filter, then marks | `Esc` | |
 
 The bar along the top of the window carries the favourites: the left pane's against the left
 edge, the right pane's against the right. A favourite opens in its own pane whichever pane has

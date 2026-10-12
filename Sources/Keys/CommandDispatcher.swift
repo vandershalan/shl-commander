@@ -107,7 +107,12 @@ struct CommandDispatcher {
             state.left.showHidden = showing
             state.right.showHidden = showing
         case .clearFilter:
-            panel.stopFiltering()
+            // Escape peels back one layer at a time: the filter first, then the marks.
+            if panel.isFiltering {
+                panel.stopFiltering()
+            } else {
+                panel.clearMarks()
+            }
         case .measureSelectedDirectories:
             panel.measureSelectedDirectories()
         case .measureAllDirectories:
@@ -197,7 +202,7 @@ struct CommandDispatcher {
         switch command {
         case .historyBack: return panel.canGoBack
         case .historyForward: return panel.canGoForward
-        case .clearFilter: return panel.isFiltering
+        case .clearFilter: return panel.isFiltering || !panel.marks.isEmpty
         case .markNone, .invertMarks: return !panel.entries.isEmpty
         case .createArchive: return !panel.actionTargets.isEmpty && !panel.isInsideArchive
         case .unpackArchive:

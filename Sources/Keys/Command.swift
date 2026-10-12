@@ -140,7 +140,7 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .sortBySize: return "Sort by Size"
         case .toggleHidden: return "Show Hidden Files"
         case .toggleDirectoriesFirst: return "Group Folders First"
-        case .clearFilter: return "Clear Filter"
+        case .clearFilter: return "Clear Filter or Marks"
         case .measureSelectedDirectories: return "Measure Selected Folders"
         case .measureAllDirectories: return "Measure All Folders"
         case .zoomIn: return "Zoom In"
