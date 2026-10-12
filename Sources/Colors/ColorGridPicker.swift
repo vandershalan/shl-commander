@@ -72,9 +72,12 @@ struct ColorGridPicker: View {
         }
     }
 
+    /// Drawn the way the window draws the colour — translucent over the pane background — so
+    /// what is picked here is what appears on the path bars and favourites.
     private func swatch(_ color: PaletteColor, size: CGFloat) -> some View {
         Rectangle()
-            .fill(color.color)
+            .fill(color.uiColor)
+            .background(Color(nsColor: .controlBackgroundColor))
             .frame(width: size, height: size)
             .overlay(Rectangle().strokeBorder(.primary.opacity(0.2), lineWidth: 0.5))
     }

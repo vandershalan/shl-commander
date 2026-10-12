@@ -57,7 +57,7 @@ struct FavoritesBarView: View {
         .padding(.horizontal, scale(7))
         .padding(.vertical, scale(2))
         .background(
-            colors.color(for: favorite.path)?.color.opacity(0.5)
+            colors.color(for: favorite.path)?.uiColor
                 ?? Color.secondary.opacity(0.15),
             in: Capsule()
         )

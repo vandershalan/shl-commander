@@ -113,6 +113,18 @@ final class PathColorStore {
     }
 }
 
+extension PaletteColor {
+    /// Strength of a path colour where it marks the active pane and the favourites. Kept
+    /// translucent so text stays readable on dark shades.
+    static let activeOpacity = 0.45
+    /// Fainter, so the inactive pane recedes.
+    static let inactiveOpacity = 0.28
+
+    /// The colour as the window draws it for the active pane and favourites: translucent over
+    /// the pane's background. Preferences shows swatches this way so they match.
+    var uiColor: Color { color.opacity(Self.activeOpacity) }
+}
+
 extension PathColorStore {
     /// Fill behind a path bar, and behind the tab that owns it, so the two read as one shape.
     /// A folder no rule matches keeps the plain look: tinted with the accent when active.
@@ -120,6 +132,7 @@ extension PathColorStore {
         guard let color = color(for: path) else {
             return isActive ? Color.accentColor.opacity(0.18) : Color.clear
         }
-        return color.color.opacity(isActive ? 0.45 : 0.28)
+        return isActive
+            ? color.uiColor : color.color.opacity(PaletteColor.inactiveOpacity)
     }
 }
