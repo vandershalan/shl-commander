@@ -14,7 +14,9 @@ cursor that never wanders, marks kept separate from the cursor, and a command fo
 - **Keyboard first.** Every command has a Total Commander binding and a ⌘ equivalent, all
   remappable. Typing any character starts a quick filter.
 - **Marks separate from the cursor**, the way Total Commander does it: `Space` and `Insert`
-  mark rows while the arrows move the cursor independently. Mark by shell glob with `Num +`.
+  mark rows while the arrows move the cursor independently. `⇧` with a cursor key marks the
+  rows passed over, `⇧`-click marks a range and `⌘`-click toggles one row. Mark by shell glob
+  with `Num +`.
 - **Fast copies.** On one APFS volume, `clonefile(2)` copies a file or a whole tree instantly
   by sharing blocks; `rename(2)` moves one instantly. Only cross-volume work reads and writes
   bytes, and only then does progress mean anything.
@@ -165,6 +167,8 @@ setting. Holding `fn` works too.
 | Actual size | | `⌘0` |
 | Mark | `Space` | |
 | Mark and advance | `Insert` | `⇧Space` |
+| Mark while moving | `⇧↑` `⇧↓` `⇧PgUp` `⇧PgDn` `⇧Home` `⇧End` | |
+| Mark range / toggle one with the mouse | `⇧`-click / `⌘`-click | |
 | Mark / unmark by pattern | keypad `+` / keypad `-` | |
 | Invert marks | keypad `*` | |
 | Mark all / none | `⌃A` / `⌃⇧A` | `⌘A` / `⌘⇧A` |

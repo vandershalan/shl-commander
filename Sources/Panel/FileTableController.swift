@@ -10,6 +10,12 @@ import QuickLookUI
 final class FileTable: NSTableView {
     var keyHandler: (NSEvent) -> Bool = { _ in false }
     var onMove: (CursorMove) -> Void = { _ in }
+    /// A cursor key with Shift: move and mark the rows passed over.
+    var onExtendMarks: (CursorMove) -> Void = { _ in }
+    /// Shift-click: mark from the cursor to the clicked row.
+    var onMarkRange: (Int) -> Void = { _ in }
+    /// ⌘-click: toggle the clicked row's mark.
+    var onToggleMark: (Int) -> Void = { _ in }
     var onBecomeFirstResponder: () -> Void = {}
     /// Builds the right-click menu. The row is nil when the click landed below the last row,
     /// which means the folder itself rather than anything in it.
@@ -79,7 +85,29 @@ final class FileTable: NSTableView {
             super.keyDown(with: event)
             return
         }
-        onMove(move)
+        let modifiers = event.modifierFlags.intersection(KeyChord.significant)
+        if modifiers == .shift {
+            onExtendMarks(move)
+        } else {
+            onMove(move)
+        }
+    }
+
+    /// Shift- and ⌘-clicks mark rather than select: the table only ever selects the cursor
+    /// row, and marks are what every command acts on.
+    override func mouseDown(with event: NSEvent) {
+        let modifiers = event.modifierFlags.intersection(KeyChord.significant)
+        let row = row(at: convert(event.locationInWindow, from: nil))
+        guard row >= 0, modifiers == .shift || modifiers == .command else {
+            super.mouseDown(with: event)
+            return
+        }
+        window?.makeFirstResponder(self)
+        if modifiers == .shift {
+            onMarkRange(row)
+        } else {
+            onToggleMark(row)
+        }
     }
 }
 

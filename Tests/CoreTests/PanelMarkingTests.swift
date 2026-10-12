@@ -204,4 +204,63 @@ struct PanelMarkingTests {
         panel.move(.top)
         #expect(panel.cursor == 0)
     }
+
+    @Test("Shift+Down marks the rows the cursor leaves, skipping the parent row")
+    func shiftDownMarks() async throws {
+        let tree = try TempTree("shiftdown")
+        defer { tree.remove() }
+        let panel = try await panel(in: tree)
+
+        panel.cursor = 0  // ".."
+        panel.extendMarks(.down)
+        panel.extendMarks(.down)
+        panel.extendMarks(.down)
+
+        #expect(panel.cursor == 3)
+        #expect(Set(panel.markedEntries.map(\.name)) == ["sub", "alpha.txt"])
+    }
+
+    @Test("a Shift sweep starting on a marked row unmarks")
+    func shiftSweepUnmarks() async throws {
+        let tree = try TempTree("shiftunmark")
+        defer { tree.remove() }
+        let panel = try await panel(in: tree)
+        panel.markAll()
+
+        panel.cursor = 4  // "notes.md"
+        panel.extendMarks(.up)
+        panel.extendMarks(.up)
+
+        #expect(panel.cursor == 2)
+        #expect(Set(panel.markedEntries.map(\.name)) == ["sub", "alpha.txt"])
+    }
+
+    @Test("Shift+End marks everything to the end, the last row included")
+    func shiftEndMarks() async throws {
+        let tree = try TempTree("shiftend")
+        defer { tree.remove() }
+        let panel = try await panel(in: tree)
+
+        panel.cursor = 2
+        panel.extendMarks(.bottom)
+        #expect(Set(panel.markedEntries.map(\.name)) == ["alpha.txt", "beta.txt"])
+        panel.extendMarks(.down)  // already at the end: marks the row it sits on
+        #expect(Set(panel.markedEntries.map(\.name)) == ["alpha.txt", "beta.txt", "notes.md"])
+    }
+
+    @Test("Shift-click marks a range; ⌘-click toggles one row")
+    func mouseMarking() async throws {
+        let tree = try TempTree("mousemark")
+        defer { tree.remove() }
+        let panel = try await panel(in: tree)
+
+        panel.cursor = 1
+        panel.markRange(to: 3)
+        #expect(panel.cursor == 3)
+        #expect(Set(panel.markedEntries.map(\.name)) == ["sub", "alpha.txt", "beta.txt"])
+
+        panel.toggleMark(at: 2)
+        #expect(panel.cursor == 2)
+        #expect(Set(panel.markedEntries.map(\.name)) == ["sub", "beta.txt"])
+    }
 }

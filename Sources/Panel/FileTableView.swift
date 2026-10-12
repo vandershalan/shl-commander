@@ -27,6 +27,9 @@ struct FileTableView: NSViewRepresentable {
 
     let onCursorChange: (Int) -> Void
     let onMove: (CursorMove) -> Void
+    let onExtendMarks: (CursorMove) -> Void
+    let onMarkRange: (Int) -> Void
+    let onToggleMark: (Int) -> Void
     let onOpen: () -> Void
     let onSort: (SortKey, Bool) -> Void
     let onActivate: () -> Void
@@ -110,6 +113,9 @@ struct FileTableView: NSViewRepresentable {
         table.contextMenu = contextMenu
         table.keyHandler = onKeyDown
         table.onMove = onMove
+        table.onExtendMarks = onExtendMarks
+        table.onMarkRange = onMarkRange
+        table.onToggleMark = onToggleMark
         table.onBecomeFirstResponder = onActivate
 
         if controller.scale != scale {

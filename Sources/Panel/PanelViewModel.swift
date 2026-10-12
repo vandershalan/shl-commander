@@ -583,6 +583,58 @@ final class PanelViewModel: Identifiable {
         if advance { cursor += 1 }
     }
 
+    /// Shift plus a cursor key: moves the cursor and marks every row it leaves behind, the
+    /// way Total Commander does. The first row of a sweep decides whether the sweep marks or
+    /// unmarks, so Shift+arrows over a marked run takes the marks back off.
+    func extendMarks(_ move: CursorMove) {
+        let from = cursor
+        let marking: Bool
+        if let sweep, sweep.cursor == from {
+            marking = sweep.marking
+        } else {
+            marking = !(cursorEntry.map(isMarked) ?? false)
+        }
+        self.move(move)
+        let to = cursor
+        // The rows passed over, not the one landed on, so the next step picks up from there.
+        // At the edge the cursor cannot move, and then the row it sits on is the one meant.
+        let range = to == from ? from...from : (to > from ? from...(to - 1) : (to + 1)...from)
+        setMarks(range, marked: marking)
+        sweep = (to, marking)
+    }
+
+    /// Shift-click: marks every row from the cursor to `row` inclusive and moves the cursor
+    /// there.
+    func markRange(to row: Int) {
+        guard entries.indices.contains(row) else { return }
+        let from = cursor
+        setMarks(min(from, row)...max(from, row), marked: true)
+        cursor = row
+        sweep = nil
+    }
+
+    /// ⌘-click: toggles `row` and moves the cursor onto it.
+    func toggleMark(at row: Int) {
+        guard entries.indices.contains(row) else { return }
+        toggleMark(entries[row])
+        cursor = row
+        sweep = nil
+    }
+
+    /// Where the last Shift sweep left the cursor and what it was doing, so the next step of
+    /// the same sweep carries on rather than re-deciding from the row it lands on.
+    @ObservationIgnored private var sweep: (cursor: Int, marking: Bool)?
+
+    private func setMarks(_ rows: ClosedRange<Int>, marked: Bool) {
+        for index in rows where entries.indices.contains(index) && !entries[index].isParent {
+            if marked {
+                marks.insert(entries[index].url)
+            } else {
+                marks.remove(entries[index].url)
+            }
+        }
+    }
+
     func toggleMark(_ entry: FileEntry) {
         guard !entry.isParent else { return }
         if marks.contains(entry.url) {

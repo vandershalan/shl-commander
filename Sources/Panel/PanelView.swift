@@ -51,6 +51,9 @@ struct PanelView: View {
                 renameRequestID: panel.renameRequestID,
                 onCursorChange: { panel.cursor = $0 },
                 onMove: { panel.move($0) },
+                onExtendMarks: { panel.extendMarks($0) },
+                onMarkRange: { panel.markRange(to: $0) },
+                onToggleMark: { panel.toggleMark(at: $0) },
                 onOpen: { panel.openCursor() },
                 onSort: { key, ascending in
                     panel.sort = SortOrder(
