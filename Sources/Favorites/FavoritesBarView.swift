@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 /// One pane's favourite folders, shown above the window. Clicking one opens it in a new tab
 /// of that pane, whichever pane has focus; ⌥-clicking sends the pane's current tab there
-/// instead. The first nine across both groups also answer to ⌘1–⌘9.
+/// instead. The first nine of the left group answer to ⌃1–⌃9, of the right to ⌘1–⌘9.
 ///
 /// Draws no background or fixed height of its own: `MainWindow` owns the bar it sits in.
 struct FavoritesBarView: View {
@@ -46,7 +46,7 @@ struct FavoritesBarView: View {
     private func chip(_ favorite: Favorite, number: Int?) -> some View {
         HStack(spacing: 4) {
             if let number {
-                Text("\u{2318}\(number)")
+                Text("\(side == .left ? "\u{2303}" : "\u{2318}")\(number)")
                     .font(.system(size: scale(9), weight: .medium))
                     .foregroundStyle(.tertiary)
             }

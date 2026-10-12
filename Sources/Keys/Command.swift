@@ -75,15 +75,24 @@ enum Command: String, CaseIterable, Codable, Sendable {
     // Favourites
     case addFavorite
     case showFavorites
-    case favorite1
-    case favorite2
-    case favorite3
-    case favorite4
-    case favorite5
-    case favorite6
-    case favorite7
-    case favorite8
-    case favorite9
+    case leftFavorite1
+    case leftFavorite2
+    case leftFavorite3
+    case leftFavorite4
+    case leftFavorite5
+    case leftFavorite6
+    case leftFavorite7
+    case leftFavorite8
+    case leftFavorite9
+    case rightFavorite1
+    case rightFavorite2
+    case rightFavorite3
+    case rightFavorite4
+    case rightFavorite5
+    case rightFavorite6
+    case rightFavorite7
+    case rightFavorite8
+    case rightFavorite9
 
     // Panes
     case sendPathToOtherPane
@@ -151,9 +160,12 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .openInOtherPaneTab: return "Open in Other Pane"
         case .addFavorite: return "Add to Favourites"
         case .showFavorites: return "Favourites…"
-        case .favorite1, .favorite2, .favorite3, .favorite4, .favorite5, .favorite6,
-            .favorite7, .favorite8, .favorite9:
-            return "Favourite \(favoriteNumber ?? 0)"
+        case .leftFavorite1, .leftFavorite2, .leftFavorite3, .leftFavorite4, .leftFavorite5,
+            .leftFavorite6, .leftFavorite7, .leftFavorite8, .leftFavorite9:
+            return "Left Favourite \(favoriteSlot?.number ?? 0)"
+        case .rightFavorite1, .rightFavorite2, .rightFavorite3, .rightFavorite4, .rightFavorite5,
+            .rightFavorite6, .rightFavorite7, .rightFavorite8, .rightFavorite9:
+            return "Right Favourite \(favoriteSlot?.number ?? 0)"
         case .sendPathToOtherPane: return "Send Path to Other Pane"
         case .takePathFromOtherPane: return "Take Path from Other Pane"
         case .swapPanes: return "Swap Panes"
@@ -180,8 +192,11 @@ enum Command: String, CaseIterable, Codable, Sendable {
         case .sendPathToOtherPane, .takePathFromOtherPane, .swapPanes, .newTab, .closeTab,
             .nextTab, .previousTab, .openInOtherPaneTab:
             return .panes
-        case .addFavorite, .showFavorites, .favorite1, .favorite2, .favorite3, .favorite4,
-            .favorite5, .favorite6, .favorite7, .favorite8, .favorite9:
+        case .addFavorite, .showFavorites,
+            .leftFavorite1, .leftFavorite2, .leftFavorite3, .leftFavorite4, .leftFavorite5,
+            .leftFavorite6, .leftFavorite7, .leftFavorite8, .leftFavorite9,
+            .rightFavorite1, .rightFavorite2, .rightFavorite3, .rightFavorite4, .rightFavorite5,
+            .rightFavorite6, .rightFavorite7, .rightFavorite8, .rightFavorite9:
             return .favorites
         case .showShortcuts:
             return .help
@@ -195,21 +210,17 @@ enum Command: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    /// 1-9 for the numbered favourite commands, nil for everything else. Lets one dispatcher
-    /// branch cover all nine rather than repeating it nine times.
-    var favoriteNumber: Int? {
-        switch self {
-        case .favorite1: return 1
-        case .favorite2: return 2
-        case .favorite3: return 3
-        case .favorite4: return 4
-        case .favorite5: return 5
-        case .favorite6: return 6
-        case .favorite7: return 7
-        case .favorite8: return 8
-        case .favorite9: return 9
-        default: return nil
+    /// Pane group and 1-9 position for the numbered favourite commands, nil for everything
+    /// else. Lets one dispatcher branch cover all eighteen rather than repeating it.
+    var favoriteSlot: (side: AppState.Side, number: Int)? {
+        let name = rawValue
+        for side in AppState.Side.allCases {
+            let prefix = "\(side.rawValue)Favorite"
+            if name.hasPrefix(prefix), let number = Int(name.dropFirst(prefix.count)) {
+                return (side, number)
+            }
         }
+        return nil
     }
 
     enum Section: String, CaseIterable, Sendable {

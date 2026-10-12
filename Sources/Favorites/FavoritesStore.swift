@@ -22,11 +22,6 @@ final class FavoritesStore {
         favorites.filter { $0.side == side }
     }
 
-    /// Left pane's favourites, then the right's: the order ⌘1–⌘9 count in.
-    var ordered: [Favorite] {
-        favorites(on: .left) + favorites(on: .right)
-    }
-
     /// Adding a directory already bookmarked for that pane is a no-op, so ⌘⇧D can be pressed
     /// twice safely. The same folder may still be a favourite of both panes.
     @discardableResult
@@ -84,16 +79,17 @@ final class FavoritesStore {
         save()
     }
 
-    /// 1-based, matching the ⌘1–⌘9 shortcuts, counted across `ordered`.
-    func favorite(number: Int) -> Favorite? {
-        let list = ordered
+    /// 1-based position within one pane's group, matching ⌃1–⌃9 (left) and ⌘1–⌘9 (right).
+    func favorite(number: Int, on side: AppState.Side) -> Favorite? {
+        let group = favorites(on: side)
         let index = number - 1
-        return list.indices.contains(index) ? list[index] : nil
+        return group.indices.contains(index) ? group[index] : nil
     }
 
-    /// The shortcut number for `favorite`, or nil past the ninth.
+    /// The shortcut number for `favorite` within its group, or nil past the ninth.
     func number(of favorite: Favorite) -> Int? {
-        guard let index = ordered.firstIndex(where: { $0.id == favorite.id }), index < 9
+        guard let index = favorites(on: favorite.side).firstIndex(where: { $0.id == favorite.id }),
+            index < 9
         else { return nil }
         return index + 1
     }

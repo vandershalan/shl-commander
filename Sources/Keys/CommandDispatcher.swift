@@ -162,10 +162,12 @@ struct CommandDispatcher {
             addFavorite(panel.directory, side: state.active)
         case .showFavorites:
             showFavoritesMenu()
-        case .favorite1, .favorite2, .favorite3, .favorite4, .favorite5, .favorite6,
-            .favorite7, .favorite8, .favorite9:
-            guard let number = command.favoriteNumber,
-                let favorite = state.favorites.favorite(number: number)
+        case .leftFavorite1, .leftFavorite2, .leftFavorite3, .leftFavorite4, .leftFavorite5,
+            .leftFavorite6, .leftFavorite7, .leftFavorite8, .leftFavorite9,
+            .rightFavorite1, .rightFavorite2, .rightFavorite3, .rightFavorite4, .rightFavorite5,
+            .rightFavorite6, .rightFavorite7, .rightFavorite8, .rightFavorite9:
+            guard let slot = command.favoriteSlot,
+                let favorite = state.favorites.favorite(number: slot.number, on: slot.side)
             else { break }
             open(favorite)
 
@@ -855,7 +857,7 @@ struct CommandDispatcher {
                     action: #selector(FavoriteMenuTarget.open(_:)),
                     keyEquivalent: number.map(String.init) ?? ""
                 )
-                item.keyEquivalentModifierMask = .command
+                item.keyEquivalentModifierMask = side == .left ? .control : .command
                 item.target = state.favoriteMenuTarget
                 item.representedObject = favorite.id.uuidString
                 item.toolTip = favorite.path

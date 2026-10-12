@@ -19,7 +19,7 @@ cursor that never wanders, marks kept separate from the cursor, and a command fo
   by sharing blocks; `rename(2)` moves one instantly. Only cross-volume work reads and writes
   bytes, and only then does progress mean anything.
 - **Directory sizes on demand** (`⌃L`), cached against the folder's timestamp.
-- **Favourite folders** per pane on `⌘1`–`⌘9`, with a drag-to-reorder bar.
+- **Favourite folders** per pane on `⌃1`–`⌃9` (left) and `⌘1`–`⌘9` (right), with a drag-to-reorder bar.
 - **Live panes.** Each watches its own directory through FSEvents and reloads on change,
   keeping the cursor and the marks.
 - **Session restore**: tabs, paths, sort, and focus come back on relaunch.
@@ -150,7 +150,8 @@ setting. Holding `fn` works too.
 | Open folder in other pane | `⌃↑` | |
 | Favourites list | `⌃D` | `⌘B` |
 | Add to favourites | | `⌘⇧D` |
-| Jump to favourite 1–9 | | `⌘1`–`⌘9` |
+| Left pane favourite 1–9 | `⌃1`–`⌃9` | |
+| Right pane favourite 1–9 | | `⌘1`–`⌘9` |
 | Switch pane | `Tab` | |
 | Open | `Return`, keypad `Enter` | |
 | Enclosing folder | `Backspace`, `⌃PageUp` | `⌘↑` |
@@ -176,8 +177,9 @@ setting. Holding `fn` works too.
 
 The bar along the top of the window carries the favourites: the left pane's against the left
 edge, the right pane's against the right. A favourite opens in its own pane whichever pane has
-focus — click for a new tab, `⌥`-click to replace the current one. `⌘1`–`⌘9` count the left
-group first, then the right; favourites past the ninth have no shortcut. New favourites join the
+focus — click for a new tab, `⌥`-click to replace the current one. `⌃1`–`⌃9` open the left
+group's favourites, `⌘1`–`⌘9` the right's; favourites past the ninth in a group have no
+shortcut. New favourites join the
 active pane's group; drag a chip or use its context menu to move it across. The title bar
 holds buttons to add a favourite, show or hide hidden files, group folders first, and open the
 shortcut list. Sorting is also available by clicking a column header.
