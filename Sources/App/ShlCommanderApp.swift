@@ -14,6 +14,8 @@ struct ShlCommanderApp: App {
             MainWindow(state: state)
         }
         .defaultSize(width: 1200, height: 750)
+        // Compact keeps the title bar at its usual height now that it carries buttons.
+        .windowToolbarStyle(.unifiedCompact)
         .commands { MainCommands(state: state) }
 
         Settings {

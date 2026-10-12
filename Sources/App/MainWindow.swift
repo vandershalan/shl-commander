@@ -51,26 +51,34 @@ struct MainWindow: View {
         // Outermost, so the sheet is inside it: sheet content is presented from here and takes
         // the environment as it stands at this point, not as it was inside the VStack.
         .environment(\.uiScale, scale)
+        .toolbar { titleBarButtons }
         .task { state.start() }
     }
 
-    /// Favourites plus the buttons that do not belong to any one pane.
+    /// Favourites across the top of the window.
     private var topBar: some View {
+        let dispatcher = CommandDispatcher(state: state)
+        return FavoritesBarView(
+            store: state.favorites,
+            colors: state.pathColors,
+            onOpen: { dispatcher.open($0, inNewTab: $1) },
+            onAddCurrent: { dispatcher.perform(.addFavorite) }
+        )
+        .font(.system(size: scale(13)))
+        .padding(.horizontal, scale(8))
+        .frame(height: scale(26))
+        .background(.bar)
+    }
+
+    /// Buttons that do not belong to any one pane, in the window's title bar.
+    @ToolbarContentBuilder
+    private var titleBarButtons: some ToolbarContent {
         let dispatcher = CommandDispatcher(state: state)
         // Both panes share the setting, so either one answers for it.
         let showingHidden = state.activePanel.showHidden
         let grouping = state.settings.directoriesFirst
 
-        return HStack(spacing: 8) {
-            FavoritesBarView(
-                store: state.favorites,
-                colors: state.pathColors,
-                onOpen: { dispatcher.open($0) },
-                onAddCurrent: { dispatcher.perform(.addFavorite) }
-            )
-
-            Divider().frame(height: scale(14))
-
+        ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 dispatcher.perform(.toggleHidden)
             } label: {
@@ -79,7 +87,6 @@ struct MainWindow: View {
                     // which of two similar glyphs is showing.
                     .foregroundStyle(showingHidden ? Color.accentColor : Color.secondary)
             }
-            .buttonStyle(.borderless)
             .help(
                 showingHidden
                     ? "Hide hidden files (\u{2318}\u{21E7}.)"
@@ -92,7 +99,6 @@ struct MainWindow: View {
                 Image(systemName: grouping ? "folder.fill" : "folder")
                     .foregroundStyle(grouping ? Color.accentColor : Color.secondary)
             }
-            .buttonStyle(.borderless)
             .help(
                 grouping
                     ? "Folders group before files \u{2014} click to sort them together (\u{2303}G)"
@@ -104,13 +110,8 @@ struct MainWindow: View {
             } label: {
                 Image(systemName: "keyboard")
             }
-            .buttonStyle(.borderless)
             .help("Keyboard shortcuts (\u{2318}/)")
         }
-        .font(.system(size: scale(13)))
-        .padding(.horizontal, scale(8))
-        .frame(height: scale(26))
-        .background(.bar)
     }
 
     private var panes: some View {
