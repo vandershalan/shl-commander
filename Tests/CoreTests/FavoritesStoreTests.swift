@@ -136,4 +136,73 @@ struct FavoritesStoreTests {
 
         #expect(FavoritesStore(fileURL: url).favorites.isEmpty)
     }
+
+    @Test("⌘1–⌘9 count the left pane's favourites first, then the right's")
+    func numberingAcrossSides() throws {
+        let tree = try TempTree("fav-sides")
+        defer { tree.remove() }
+        let store = store(in: tree)
+        store.add(try tree.directory("R1"), side: .right)
+        store.add(try tree.directory("L1"), side: .left)
+        store.add(try tree.directory("R2"), side: .right)
+
+        #expect(store.ordered.map(\.name) == ["L1", "R1", "R2"])
+        #expect(store.favorite(number: 2)?.name == "R1")
+        #expect(store.favorites(on: .right).map(\.name) == ["R1", "R2"])
+    }
+
+    @Test("only the first nine favourites get a shortcut number")
+    func numbersStopAtNine() throws {
+        let tree = try TempTree("fav-nine")
+        defer { tree.remove() }
+        let store = store(in: tree)
+        for index in 1...10 {
+            store.add(try tree.directory("F\(index)"), side: index.isMultiple(of: 2) ? .right : .left)
+        }
+
+        let numbers = store.ordered.map { store.number(of: $0) }
+        #expect(numbers == [1, 2, 3, 4, 5, 6, 7, 8, 9, nil])
+    }
+
+    @Test("the same folder may be a favourite of both panes")
+    func sameFolderBothSides() throws {
+        let tree = try TempTree("fav-both")
+        defer { tree.remove() }
+        let folder = try tree.directory("Shared")
+        let store = store(in: tree)
+
+        #expect(store.add(folder, side: .left) != nil)
+        #expect(store.add(folder, side: .right) != nil)
+        #expect(store.add(folder, side: .right) == nil)
+    }
+
+    @Test("a favourite can be moved to the other pane, by menu or by drag")
+    func changeSide() throws {
+        let tree = try TempTree("fav-move-side")
+        defer { tree.remove() }
+        let store = store(in: tree)
+        let a = try #require(store.add(try tree.directory("A"), side: .left))
+        let b = try #require(store.add(try tree.directory("B"), side: .right))
+
+        store.setSide(a, to: .right)
+        #expect(store.favorites(on: .right).map(\.name) == ["B", "A"])
+
+        store.move(id: a.id, onto: b)
+        #expect(store.favorites(on: .right).map(\.name) == ["A", "B"])
+
+        store.setSide(b, to: .left)
+        #expect(store.favorites(on: .left).map(\.name) == ["B"])
+    }
+
+    @Test("favourites saved before panes had their own load onto the left")
+    func legacyFileLoadsLeft() throws {
+        let tree = try TempTree("fav-legacy")
+        defer { tree.remove() }
+        let url = tree.root.appendingPathComponent("favorites.json")
+        let json = #"[{"id":"\#(UUID().uuidString)","name":"Old","path":"/tmp"}]"#
+        try Data(json.utf8).write(to: url)
+
+        let store = FavoritesStore(fileURL: url)
+        #expect(store.favorites.map(\.side) == [.left])
+    }
 }

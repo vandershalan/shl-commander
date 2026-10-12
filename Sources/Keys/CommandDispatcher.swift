@@ -159,7 +159,7 @@ struct CommandDispatcher {
             // A favourite is a real folder. Inside an archive that is the folder holding it —
             // bookmarking a spot inside would point at something that stops existing the moment
             // the archive is rebuilt.
-            addFavorite(panel.directory)
+            addFavorite(panel.directory, side: state.active)
         case .showFavorites:
             showFavoritesMenu()
         case .favorite1, .favorite2, .favorite3, .favorite4, .favorite5, .favorite6,
@@ -807,14 +807,16 @@ struct CommandDispatcher {
             ])
             return
         }
+        // A favourite belongs to one pane and opens there, whichever pane has focus.
+        let panel = state.panel(favorite.side)
         if inNewTab {
-            state.activePanel.openTab(at: favorite.url)
+            panel.openTab(at: favorite.url)
         } else {
-            state.activePanel.navigate(to: favorite.url)
+            panel.navigate(to: favorite.url)
         }
     }
 
-    private func addFavorite(_ url: URL) {
+    private func addFavorite(_ url: URL, side: AppState.Side) {
         let suggested = url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
         Task { [state] in
             guard
@@ -830,7 +832,7 @@ struct CommandDispatcher {
                 )?.trimmingCharacters(in: .whitespacesAndNewlines),
                 !name.isEmpty
             else { return }
-            state.favorites.add(url, name: name)
+            state.favorites.add(url, name: name, side: side)
         }
     }
 
@@ -842,22 +844,30 @@ struct CommandDispatcher {
             empty.isEnabled = false
             menu.addItem(empty)
         }
-        for (index, favorite) in state.favorites.favorites.enumerated() {
-            let item = NSMenuItem(
-                title: favorite.name,
-                action: #selector(FavoriteMenuTarget.open(_:)),
-                keyEquivalent: index < 9 ? String(index + 1) : ""
-            )
-            item.keyEquivalentModifierMask = .command
-            item.target = state.favoriteMenuTarget
-            item.representedObject = favorite.path
-            item.toolTip = favorite.path
-            item.isEnabled = favorite.exists
-            menu.addItem(item)
+        for side in AppState.Side.allCases {
+            let group = state.favorites.favorites(on: side)
+            guard !group.isEmpty else { continue }
+            menu.addItem(.sectionHeader(title: side == .left ? "Left pane" : "Right pane"))
+            for favorite in group {
+                let number = state.favorites.number(of: favorite)
+                let item = NSMenuItem(
+                    title: favorite.name,
+                    action: #selector(FavoriteMenuTarget.open(_:)),
+                    keyEquivalent: number.map(String.init) ?? ""
+                )
+                item.keyEquivalentModifierMask = .command
+                item.target = state.favoriteMenuTarget
+                item.representedObject = favorite.id.uuidString
+                item.toolTip = favorite.path
+                item.isEnabled = favorite.exists
+                menu.addItem(item)
+            }
         }
 
-        state.favoriteMenuTarget.onOpen = { [state] path in
-            state.activePanel.navigate(to: URL(fileURLWithPath: path))
+        state.favoriteMenuTarget.onOpen = { [state] id in
+            guard let favorite = state.favorites.favorites.first(where: { $0.id.uuidString == id })
+            else { return }
+            CommandDispatcher(state: state).open(favorite)
         }
         let window = NSApp.keyWindow
         let location = NSPoint(x: 20, y: (window?.contentView?.bounds.height ?? 400) - 20)

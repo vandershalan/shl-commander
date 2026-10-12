@@ -8,19 +8,36 @@ struct Favorite: Codable, Identifiable, Hashable, Sendable {
     var id: UUID
     var name: String
     var path: String
+    /// The pane this favourite opens in, whichever pane has focus.
+    var side: AppState.Side
 
-    init(id: UUID = UUID(), name: String, path: String) {
+    init(id: UUID = UUID(), name: String, path: String, side: AppState.Side = .left) {
         self.id = id
         self.name = name
         self.path = path
+        self.side = side
     }
 
-    init(url: URL, name: String? = nil) {
+    init(url: URL, name: String? = nil, side: AppState.Side = .left) {
         let path = url.standardizedFileURL.path
         self.init(
             name: name ?? (url.lastPathComponent.isEmpty ? path : url.lastPathComponent),
-            path: path
+            path: path,
+            side: side
         )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, path, side
+    }
+
+    /// Files written before favourites had a side load them all onto the left.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        path = try container.decode(String.self, forKey: .path)
+        side = try container.decodeIfPresent(AppState.Side.self, forKey: .side) ?? .left
     }
 
     var url: URL { URL(fileURLWithPath: path) }

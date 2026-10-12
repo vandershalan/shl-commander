@@ -55,14 +55,20 @@ struct MainWindow: View {
         .task { state.start() }
     }
 
-    /// Favourites across the top of the window.
+    /// Favourites across the top of the window: the left pane's against the left edge, the
+    /// right pane's against the right.
     private var topBar: some View {
         let dispatcher = CommandDispatcher(state: state)
-        return FavoritesBarView(
-            store: state.favorites,
-            colors: state.pathColors,
-            onOpen: { dispatcher.open($0, inNewTab: $1) }
-        )
+        return HStack(spacing: scale(8)) {
+            ForEach(AppState.Side.allCases, id: \.self) { side in
+                FavoritesBarView(
+                    store: state.favorites,
+                    colors: state.pathColors,
+                    side: side,
+                    onOpen: { dispatcher.open($0, inNewTab: $1) }
+                )
+            }
+        }
         .font(.system(size: scale(13)))
         .padding(.horizontal, scale(8))
         .frame(height: scale(26))

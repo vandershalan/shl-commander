@@ -1,14 +1,16 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Favourite folders across the top of the window. Clicking one opens it in a new tab of the
-/// active pane; ⌥-clicking sends the current tab there instead. The first nine also answer to
-/// ⌘1–⌘9, which navigate the current tab.
+/// One pane's favourite folders, shown above the window. Clicking one opens it in a new tab
+/// of that pane, whichever pane has focus; ⌥-clicking sends the pane's current tab there
+/// instead. The first nine across both groups also answer to ⌘1–⌘9.
 ///
 /// Draws no background or fixed height of its own: `MainWindow` owns the bar it sits in.
 struct FavoritesBarView: View {
     let store: FavoritesStore
     let colors: PathColorStore
+    /// Whose favourites to show; the right pane's sit against the window's right edge.
+    let side: AppState.Side
     /// Where a click should navigate to, and whether it should open a new tab.
     let onOpen: (Favorite, _ inNewTab: Bool) -> Void
 
@@ -18,23 +20,26 @@ struct FavoritesBarView: View {
     @Environment(\.uiScale) private var scale
 
     var body: some View {
+        let alignment: UnitPoint = side == .left ? .leading : .trailing
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 3) {
-                ForEach(Array(store.favorites.enumerated()), id: \.element.id) { index, favorite in
-                    chip(favorite, number: index + 1)
+                ForEach(store.favorites(on: side)) { favorite in
+                    chip(favorite, number: store.number(of: favorite))
                 }
             }
             .padding(.horizontal, 2)
         }
+        .defaultScrollAnchor(alignment, for: .alignment)
+        .defaultScrollAnchor(alignment, for: .initialOffset)
     }
 
-    private func chip(_ favorite: Favorite, number: Int) -> some View {
+    private func chip(_ favorite: Favorite, number: Int?) -> some View {
         Button {
             let replacing = NSEvent.modifierFlags.contains(.option)
             onOpen(favorite, !replacing)
         } label: {
             HStack(spacing: 4) {
-                if number <= 9 {
+                if let number {
                     Text("\u{2318}\(number)")
                         .font(.system(size: scale(9), weight: .medium))
                         .foregroundStyle(.tertiary)
@@ -57,6 +62,9 @@ struct FavoritesBarView: View {
         .help("\(favorite.path)\nClick: new tab \u{2014} \u{2325}-click: current tab")
         .contextMenu {
             Button("Rename…") { rename(favorite) }
+            Button(side == .left ? "Move to Right Pane" : "Move to Left Pane") {
+                store.setSide(favorite, to: side.other)
+            }
             Button("Remove") { store.remove(favorite) }
         }
         .onDrag {
@@ -93,10 +101,8 @@ private struct ReorderDelegate: DropDelegate {
     @Binding var dragging: Favorite?
 
     func dropEntered(info: DropInfo) {
-        guard let dragging, dragging.id != target.id,
-            let destination = store.favorites.firstIndex(where: { $0.id == target.id })
-        else { return }
-        store.move(id: dragging.id, to: destination)
+        guard let dragging else { return }
+        store.move(id: dragging.id, onto: target)
     }
 
     func performDrop(info: DropInfo) -> Bool {

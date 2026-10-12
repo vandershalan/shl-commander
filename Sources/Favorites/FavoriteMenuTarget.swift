@@ -6,11 +6,11 @@ import AppKit
 /// a struct created per command, so the target lives on `AppState` instead.
 @MainActor
 final class FavoriteMenuTarget: NSObject {
-    /// Set immediately before the menu is shown.
+    /// Set immediately before the menu is shown; receives the favourite's id.
     var onOpen: ((String) -> Void)?
 
     @objc func open(_ sender: NSMenuItem) {
-        guard let path = sender.representedObject as? String else { return }
-        onOpen?(path)
+        guard let id = sender.representedObject as? String else { return }
+        onOpen?(id)
     }
 }
