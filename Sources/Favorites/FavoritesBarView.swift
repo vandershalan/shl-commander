@@ -5,14 +5,12 @@ import UniformTypeIdentifiers
 /// active pane; ⌥-clicking sends the current tab there instead. The first nine also answer to
 /// ⌘1–⌘9, which navigate the current tab.
 ///
-/// Draws no background or fixed height of its own: `MainWindow` owns the bar it sits in, so
-/// the buttons beside it share the same strip.
+/// Draws no background or fixed height of its own: `MainWindow` owns the bar it sits in.
 struct FavoritesBarView: View {
     let store: FavoritesStore
     let colors: PathColorStore
     /// Where a click should navigate to, and whether it should open a new tab.
     let onOpen: (Favorite, _ inNewTab: Bool) -> Void
-    let onAddCurrent: () -> Void
 
     /// Favourite being dragged, so a drop knows what to move.
     @State private var dragging: Favorite?
@@ -20,21 +18,13 @@ struct FavoritesBarView: View {
     @Environment(\.uiScale) private var scale
 
     var body: some View {
-        HStack(spacing: 4) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 3) {
-                    ForEach(Array(store.favorites.enumerated()), id: \.element.id) { index, favorite in
-                        chip(favorite, number: index + 1)
-                    }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 3) {
+                ForEach(Array(store.favorites.enumerated()), id: \.element.id) { index, favorite in
+                    chip(favorite, number: index + 1)
                 }
-                .padding(.horizontal, 2)
             }
-            Spacer(minLength: 0)
-            Button(action: onAddCurrent) {
-                Image(systemName: "plus")
-            }
-            .buttonStyle(.borderless)
-            .help("Add the active folder to favourites (⌘⇧D)")
+            .padding(.horizontal, 2)
         }
     }
 

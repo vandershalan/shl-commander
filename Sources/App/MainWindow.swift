@@ -61,8 +61,7 @@ struct MainWindow: View {
         return FavoritesBarView(
             store: state.favorites,
             colors: state.pathColors,
-            onOpen: { dispatcher.open($0, inNewTab: $1) },
-            onAddCurrent: { dispatcher.perform(.addFavorite) }
+            onOpen: { dispatcher.open($0, inNewTab: $1) }
         )
         .font(.system(size: scale(13)))
         .padding(.horizontal, scale(8))
@@ -79,6 +78,13 @@ struct MainWindow: View {
         let grouping = state.settings.directoriesFirst
 
         ToolbarItemGroup(placement: .primaryAction) {
+            Button {
+                dispatcher.perform(.addFavorite)
+            } label: {
+                Image(systemName: "plus")
+            }
+            .help("Add the active folder to favourites (\u{2318}\u{21E7}D)")
+
             Button {
                 dispatcher.perform(.toggleHidden)
             } label: {
@@ -112,6 +118,8 @@ struct MainWindow: View {
             }
             .help("Keyboard shortcuts (\u{2318}/)")
         }
+        // Plain glyphs in the title bar, without the glass capsule grouped items get.
+        .sharedBackgroundVisibility(.hidden)
     }
 
     private var panes: some View {
