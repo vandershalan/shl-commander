@@ -54,7 +54,6 @@ struct TabStripView: View {
                     .help("Close tab")
                 }
             }
-            .textScheme(colors.barTextScheme(for: path, isActive: selected && isActive))
             .padding(.horizontal, scale(8))
             .frame(height: scale(selected ? 20 : 18))
             // Layered on the pane's own background, exactly as the path bar is, so a

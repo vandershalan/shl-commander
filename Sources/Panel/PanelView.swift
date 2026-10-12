@@ -131,7 +131,6 @@ struct PanelView: View {
         }
         .padding(.horizontal, scale(8))
         .frame(height: scale(24))
-        .textScheme(pathColors.barTextScheme(for: panel.directory.path, isActive: isActive))
         .background(pathColors.barFill(for: panel.directory.path, isActive: isActive))
     }
 

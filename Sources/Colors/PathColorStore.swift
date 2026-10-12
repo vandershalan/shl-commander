@@ -115,32 +115,11 @@ final class PathColorStore {
 
 extension PathColorStore {
     /// Fill behind a path bar, and behind the tab that owns it, so the two read as one shape.
-    /// Active, it is the rule's colour exactly as Preferences shows it; inactive, a faint wash
-    /// of it. A folder no rule matches keeps the plain look: tinted with the accent when active.
+    /// A folder no rule matches keeps the plain look: tinted with the accent when active.
     func barFill(for path: String, isActive: Bool) -> Color {
         guard let color = color(for: path) else {
             return isActive ? Color.accentColor.opacity(0.18) : Color.clear
         }
-        return isActive ? color.color : color.color.opacity(0.28)
-    }
-
-    /// Colour scheme for text on `barFill`, or nil where the fill is light enough for the
-    /// window's own.
-    func barTextScheme(for path: String, isActive: Bool) -> ColorScheme? {
-        guard isActive, let color = color(for: path) else { return nil }
-        return color.textScheme
-    }
-}
-
-extension View {
-    /// Renders content as if in `scheme`, so `.primary` and `.secondary` text read on a
-    /// solid fill; nil leaves the window's scheme alone.
-    @ViewBuilder
-    func textScheme(_ scheme: ColorScheme?) -> some View {
-        if let scheme {
-            environment(\.colorScheme, scheme)
-        } else {
-            self
-        }
+        return color.color.opacity(isActive ? 0.45 : 0.28)
     }
 }

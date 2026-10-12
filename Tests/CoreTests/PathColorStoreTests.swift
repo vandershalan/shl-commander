@@ -83,12 +83,4 @@ struct PathColorStoreTests {
         #expect(PaletteColor.grid.count == 8)
         #expect(PaletteColor.grid.allSatisfy { $0.count == 12 })
     }
-
-    @Test("text on a solid fill is dark on light shades and light on dark ones")
-    func textSchemeFollowsLuminance() {
-        #expect(PaletteColor(rawValue: "white").textScheme == .light)
-        #expect(PaletteColor(rawValue: "yellow-200").textScheme == .light)
-        #expect(PaletteColor(rawValue: "blue-800").textScheme == .dark)
-        #expect(PaletteColor(rawValue: "black").textScheme == .dark)
-    }
 }
