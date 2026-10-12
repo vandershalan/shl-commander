@@ -10,6 +10,8 @@ struct MainWindow: View {
     @AppStorage("dividerFraction") private var dividerFraction: Double = 0.5
     /// Divider fraction at the moment the current drag started, or nil when idle.
     @State private var dragStartFraction: Double?
+    /// Favourite chip being dragged, shared so it can cross between the two groups.
+    @State private var draggedFavorite: Favorite?
 
     /// Everything the window draws is sized through this, so ⌘+/⌘- rescale the lot.
     private var scale: UIScale { UIScale(factor: state.settings.uiScale) }
@@ -65,7 +67,8 @@ struct MainWindow: View {
                     store: state.favorites,
                     colors: state.pathColors,
                     side: side,
-                    onOpen: { dispatcher.open($0, inNewTab: $1) }
+                    onOpen: { dispatcher.open($0, inNewTab: $1) },
+                    dragging: $draggedFavorite
                 )
             }
         }
