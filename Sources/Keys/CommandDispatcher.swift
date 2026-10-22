@@ -817,7 +817,7 @@ struct CommandDispatcher {
         // A favourite belongs to one pane and opens there, whichever pane has focus.
         let panel = state.panel(favorite.side)
         if inNewTab {
-            panel.openTab(at: favorite.url)
+            panel.openTab(at: favorite.url, atEnd: true)
         } else {
             panel.navigate(to: favorite.url)
         }

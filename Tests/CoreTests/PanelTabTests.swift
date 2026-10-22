@@ -114,6 +114,23 @@ struct PanelTabTests {
         #expect(panel.activeTabIndex == 2, "wraps past the start")
     }
 
+    @Test("a tab opened at the end lands after every other tab")
+    func openAtEnd() async throws {
+        let tree = try TempTree("tab-at-end")
+        defer { tree.remove() }
+        let panel = try await panel(in: tree)
+        panel.openTab(at: tree.root.appendingPathComponent("alpha"))
+        await panel.settle()
+        panel.selectTab(0)
+        await panel.settle()
+
+        panel.openTab(at: tree.root.appendingPathComponent("beta"), atEnd: true)
+        await panel.settle()
+        #expect(panel.tabs.count == 3)
+        #expect(panel.activeTabIndex == 2)
+        #expect(panel.tabs[2].title == "beta")
+    }
+
     @Test("navigating updates the active tab's label")
     func navigationUpdatesTab() async throws {
         let tree = try TempTree("tab-navigate")

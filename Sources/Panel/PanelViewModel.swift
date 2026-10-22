@@ -473,15 +473,17 @@ final class PanelViewModel: Identifiable {
         tabs[activeTabIndex].cursorName = cursorEntry?.name
     }
 
-    func openTab(at url: URL? = nil, activate: Bool = true) {
+    /// A new tab lands next to the active one, unless `atEnd` asks for the end of the strip.
+    func openTab(at url: URL? = nil, activate: Bool = true, atEnd: Bool = false) {
         captureActiveTab()
         let tab = PanelTab(
             location: url.map { PanelLocation.directory($0.standardizedFileURL) } ?? location,
             sort: sort
         )
-        tabs.insert(tab, at: activeTabIndex + 1)
+        let index = atEnd ? tabs.count : activeTabIndex + 1
+        tabs.insert(tab, at: index)
         if activate {
-            activeTabIndex += 1
+            activeTabIndex = index
             show(tabs[activeTabIndex])
         }
     }
