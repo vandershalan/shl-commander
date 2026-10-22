@@ -261,6 +261,13 @@ extension Keymap {
 /// Where the app keeps its own files.
 enum AppPaths {
     static var supportDirectory: URL {
+        #if DEBUG
+            // Lets a development build run beside the installed app without sharing its
+            // session, favourites or keymap.
+            if let override = ProcessInfo.processInfo.environment["SHL_SUPPORT_DIR"] {
+                return URL(fileURLWithPath: override, isDirectory: true)
+            }
+        #endif
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first ?? FileManager.default.homeDirectoryForCurrentUser
         return base.appendingPathComponent("shl-commander", isDirectory: true)

@@ -595,11 +595,20 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
         if rebuild {
             table.reloadData()
         } else {
+            // Unlike `reloadData`, a change in row count animates: rows fade in and out, so a
+            // listing visibly morphed into the next one. A listing should simply be there.
+            NSAnimationContext.beginGrouping()
+            NSAnimationContext.current.duration = 0
+            NSAnimationContext.current.allowsImplicitAnimation = false
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
             table.noteNumberOfRowsChanged()
             table.reloadData(
                 forRowIndexes: IndexSet(integersIn: 0..<table.numberOfRows),
                 columnIndexes: IndexSet(integersIn: 0..<table.numberOfColumns)
             )
+            CATransaction.commit()
+            NSAnimationContext.endGrouping()
         }
         isSyncingSelection = false
     }
