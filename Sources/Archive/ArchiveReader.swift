@@ -56,7 +56,12 @@ enum ArchiveReader {
             return singleStreamIndex(of: archive, format: format)
         }
 
-        let output = try run(["-tvf", archive.path], on: archive, passphrase: passphrase)
+        var output = try run(["-tvf", archive.path], on: archive, passphrase: passphrase)
+        if format == .zip, hasEscapedBytes(output) {
+            output = try run(
+                ["-tvf", archive.path], on: archive, passphrase: passphrase,
+                options: legacyZipNameOptions)
+        }
         let members = output
             .split(separator: "\n", omittingEmptySubsequences: true)
             .compactMap { parse(line: String($0)) }
@@ -319,7 +324,8 @@ enum ArchiveReader {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         // -C changes directory before extracting, so member paths stay relative to it.
         _ = try run(
-            ["-xf", archive.path, "-C", directory.path] + safe, on: archive, passphrase: passphrase)
+            ["-xf", archive.path, "-C", directory.path] + safe, on: archive, passphrase: passphrase,
+            options: try nameOptions(for: archive, format: format, passphrase: passphrase))
     }
 
     /// Extracts an archive whole, without listing it first.
@@ -342,7 +348,9 @@ enum ArchiveReader {
         }
         if isCancelled() { throw Failure.cancelled }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        _ = try run(["-xf", archive.path, "-C", directory.path], on: archive, passphrase: passphrase)
+        _ = try run(
+            ["-xf", archive.path, "-C", directory.path], on: archive, passphrase: passphrase,
+            options: try nameOptions(for: archive, format: format, passphrase: passphrase))
     }
 
     /// Extracts one member and returns where it landed.
@@ -356,16 +364,63 @@ enum ArchiveReader {
         return directory.appendingPathComponent(ArchiveIndex.normalise(member))
     }
 
+    // MARK: - Legacy zip names
+
+    /// A zip written without the UTF-8 flag — anything from Windows' own "Send to compressed
+    /// folder", and many older tools — stores names in the DOS code page of the PC that made it.
+    /// bsdtar then prints the bytes it cannot read as UTF-8 as octal escapes, so `Ł` in CP852
+    /// shows up as `\235`. Those names are re-read in a DOS code page instead.
+    ///
+    /// Only when escapes actually appear: zips from the Finder also leave the flag unset but
+    /// write UTF-8, and forcing a code page on those would garble every accented name.
+    static func nameOptions(
+        for archive: URL, format: ArchiveFormat, passphrase: String?
+    ) throws -> [String] {
+        guard format == .zip else { return [] }
+        let names = try run(["-tf", archive.path], on: archive, passphrase: passphrase)
+        return hasEscapedBytes(names) ? legacyZipNameOptions : []
+    }
+
+    static var legacyZipNameOptions: [String] {
+        ["--options", "zip:hdrcharset=\(legacyZipCharset())"]
+    }
+
+    /// bsdtar's escape for a byte it cannot print: a backslash and three octal digits. A
+    /// literal backslash in a name is printed doubled, so it is not mistaken for one.
+    static func hasEscapedBytes(_ listing: String) -> Bool {
+        listing.range(of: #"(?<!\\)\\[0-3][0-7]{2}"#, options: .regularExpression) != nil
+    }
+
+    /// The archive cannot say which code page it used, so the guess is the one a PC set up in
+    /// the user's own language would have: the language decides the DOS code page.
+    static func legacyZipCharset(languages: [String] = Locale.preferredLanguages) -> String {
+        let language =
+            languages.first.flatMap { Locale(identifier: $0).language.languageCode?.identifier }
+            ?? ""
+        switch language {
+        case "pl", "cs", "sk", "hu", "sl", "hr", "bs", "ro": return "CP852"
+        case "ru", "uk", "be", "bg", "mk": return "CP866"
+        case "tr": return "CP857"
+        case "el": return "CP737"
+        case "en", "": return "CP437"
+        default: return "CP850"
+        }
+    }
+
     // MARK: - Process
 
     private static func run(
         _ arguments: [String],
         on archive: URL,
-        passphrase: String?
+        passphrase: String?,
+        options: [String] = []
     ) throws -> String {
         let process = Process()
         process.executableURL = tool
-        process.arguments = withPassphrase(arguments, passphrase)
+        var arguments = withPassphrase(arguments, passphrase)
+        // Before any member names, like the password, or bsdtar takes them for members.
+        arguments.insert(contentsOf: options, at: min(2, arguments.count))
+        process.arguments = arguments
         // Nothing to type into: a password prompt bsdtar writes here has to fail, never wait.
         process.standardInput = FileHandle.nullDevice
         process.environment = listingEnvironment

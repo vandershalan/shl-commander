@@ -67,6 +67,34 @@ struct ArchiveFixture {
         return url
     }
 
+    /// A zip as Windows writes one: the name in a DOS code page — `Ł` is 0x9D in CP852 — and
+    /// no UTF-8 flag. Built byte by byte, because every zip tool on a Mac writes UTF-8. The one
+    /// entry is empty and stored, so its CRC is zero and there is no data to compress.
+    func makeLegacyZip() throws -> URL {
+        let name: [UInt8] = Array("SZA".utf8) + [0x9D] + Array("ANK.txt".utf8)
+        var bytes: [UInt8] = []
+        func u16(_ value: Int) { bytes += [UInt8(value & 0xFF), UInt8(value >> 8 & 0xFF)] }
+        func u32(_ value: Int) { u16(value & 0xFFFF); u16(value >> 16 & 0xFFFF) }
+
+        u32(0x0403_4B50); u16(20); u16(0); u16(0); u16(0); u16(0x21)
+        u32(0); u32(0); u32(0); u16(name.count); u16(0)
+        bytes += name
+
+        let directoryStart = bytes.count
+        u32(0x0201_4B50); u16(20); u16(20); u16(0); u16(0); u16(0); u16(0x21)
+        u32(0); u32(0); u32(0); u16(name.count); u16(0); u16(0); u16(0); u16(0)
+        u32(0); u32(0)
+        bytes += name
+        let directorySize = bytes.count - directoryStart
+
+        u32(0x0605_4B50); u16(0); u16(0); u16(1); u16(1)
+        u32(directorySize); u32(directoryStart); u16(0)
+
+        let url = tree.root.appendingPathComponent("legacy.zip")
+        try Data(bytes).write(to: url)
+        return url
+    }
+
     func remove() { tree.remove() }
 }
 
@@ -562,6 +590,41 @@ struct ArchiveReaderAccentTests {
 
         let index = try ArchiveReader.index(of: archive)
         #expect(index.members.map(\.path) == ["Szałankiewicz Tomasz.pdf"])
+    }
+
+    @Test("a zip from Windows has its DOS code page names read, not escaped")
+    func listsLegacyName() throws {
+        let fixture = try ArchiveFixture("legacy-list")
+        defer { fixture.remove() }
+        let archive = try fixture.makeLegacyZip()
+        let out = try fixture.tree.directory("out")
+
+        let index = try ArchiveReader.index(of: archive)
+        let member = try #require(index.members.first)
+        #expect(!member.path.contains("\\"), "no octal escapes left in \(member.path)")
+        if ArchiveReader.legacyZipCharset() == "CP852" {
+            #expect(member.path == "SZAŁANK.txt")
+        }
+
+        // The decoded name has to work as a member name too.
+        try ArchiveReader.extract(members: [member.path], from: archive, to: out)
+        #expect(FileManager.default.fileExists(atPath: out.appendingPathComponent(member.path).path))
+    }
+
+    @Test("the DOS code page follows the user's language")
+    func legacyCharsetByLanguage() {
+        #expect(ArchiveReader.legacyZipCharset(languages: ["pl-PL"]) == "CP852")
+        #expect(ArchiveReader.legacyZipCharset(languages: ["ru"]) == "CP866")
+        #expect(ArchiveReader.legacyZipCharset(languages: ["de-DE"]) == "CP850")
+        #expect(ArchiveReader.legacyZipCharset(languages: ["en-US"]) == "CP437")
+        #expect(ArchiveReader.legacyZipCharset(languages: []) == "CP437")
+    }
+
+    @Test("only bsdtar's octal escapes count as unreadable bytes")
+    func escapeDetection() {
+        #expect(ArchiveReader.hasEscapedBytes(#"SZA\235ANK.txt"#))
+        #expect(!ArchiveReader.hasEscapedBytes("Szałankiewicz.pdf"))
+        #expect(!ArchiveReader.hasEscapedBytes(#"back\\123slash.txt"#))
     }
 
     @Test("and that same name extracts, which needs it to have survived the listing")
