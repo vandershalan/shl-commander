@@ -585,9 +585,22 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// adjustment arrives as `tableViewSelectionDidChange` — indistinguishable from the user
     /// clicking a row. Left unmuted it overwrites the cursor position the panel just restored
     /// after a delete, with the model and the table then disagreeing about where the cursor is.
-    func reloadRows(on table: NSTableView) {
+    ///
+    /// `reloadData` throws every cell away rather than queueing it for reuse, so a listing
+    /// would build all its cells from scratch. Telling the table the row count changed and
+    /// then reloading the rows in place hands the same cells back through `makeView`.
+    /// `rebuild` keeps the full reload for a zoom, whose cells are built for the old size.
+    func reloadRows(on table: NSTableView, rebuild: Bool = false) {
         isSyncingSelection = true
-        table.reloadData()
+        if rebuild {
+            table.reloadData()
+        } else {
+            table.noteNumberOfRowsChanged()
+            table.reloadData(
+                forRowIndexes: IndexSet(integersIn: 0..<table.numberOfRows),
+                columnIndexes: IndexSet(integersIn: 0..<table.numberOfColumns)
+            )
+        }
         isSyncingSelection = false
     }
 

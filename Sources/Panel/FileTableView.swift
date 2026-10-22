@@ -125,7 +125,7 @@ struct FileTableView: NSViewRepresentable {
             controller.scale = scale
             controller.applyScale(to: table)
             // Cells are cached per scale, so this is what swaps in the newly sized ones.
-            controller.reloadRows(on: table)
+            controller.reloadRows(on: table, rebuild: true)
         }
 
         if controller.boldDirectories != boldDirectories || controller.boldFiles != boldFiles {
