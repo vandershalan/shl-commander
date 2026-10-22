@@ -12,6 +12,8 @@ struct MainWindow: View {
     @State private var dragStartFraction: Double?
     /// Favourite chip being dragged, shared so it can cross between the two groups.
     @State private var draggedFavorite: Favorite?
+    /// Tab being dragged, shared so it can cross between the two panes.
+    @State private var draggedTab: TabDrag?
 
     /// Everything the window draws is sized through this, so ⌘+/⌘- rescale the lot.
     private var scale: UIScale { UIScale(factor: state.settings.uiScale) }
@@ -139,6 +141,7 @@ struct MainWindow: View {
             HStack(spacing: 0) {
                 PanelView(
                     panel: state.left,
+                    side: .left,
                     volumes: state.volumes,
                     cloud: state.cloud,
                     pathColors: state.pathColors,
@@ -151,6 +154,8 @@ struct MainWindow: View {
                         RowContextMenu.build(row: row, panel: state.left, state: state)
                     },
                     onActivate: { state.active = .left },
+                    draggedTab: $draggedTab,
+                    onTransferTab: { state.transferTab(id: $0.id, from: $0.side, at: $1) },
                     onKeyDown: router.handle
                 )
                 .frame(width: leftWidth)
@@ -159,6 +164,7 @@ struct MainWindow: View {
 
                 PanelView(
                     panel: state.right,
+                    side: .right,
                     volumes: state.volumes,
                     cloud: state.cloud,
                     pathColors: state.pathColors,
@@ -171,6 +177,8 @@ struct MainWindow: View {
                         RowContextMenu.build(row: row, panel: state.right, state: state)
                     },
                     onActivate: { state.active = .right },
+                    draggedTab: $draggedTab,
+                    onTransferTab: { state.transferTab(id: $0.id, from: $0.side, at: $1) },
                     onKeyDown: router.handle
                 )
                 .frame(maxWidth: .infinity)

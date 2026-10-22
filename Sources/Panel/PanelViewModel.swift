@@ -496,6 +496,43 @@ final class PanelViewModel: Identifiable {
         show(tabs[activeTabIndex])
     }
 
+    /// Moves a tab within this pane. The active tab stays active wherever it ends up.
+    func moveTab(id: UUID, to index: Int) {
+        guard let from = tabs.firstIndex(where: { $0.id == id }) else { return }
+        let target = min(max(index, 0), tabs.count - 1)
+        guard from != target else { return }
+        captureActiveTab()
+        let activeID = tabs[activeTabIndex].id
+        tabs.insert(tabs.remove(at: from), at: target)
+        activeTabIndex = tabs.firstIndex { $0.id == activeID } ?? 0
+    }
+
+    /// Takes a tab out so another pane can adopt it. The last tab is refused: a pane always
+    /// shows something.
+    func removeTab(id: UUID) -> PanelTab? {
+        guard tabs.count > 1, let index = tabs.firstIndex(where: { $0.id == id }) else {
+            return nil
+        }
+        captureActiveTab()
+        let tab = tabs.remove(at: index)
+        if index == activeTabIndex {
+            activeTabIndex = min(index, tabs.count - 1)
+            show(tabs[activeTabIndex])
+        } else if index < activeTabIndex {
+            activeTabIndex -= 1
+        }
+        return tab
+    }
+
+    /// Adopts a tab from the other pane, at `index` or at the end, and shows it.
+    func insertTab(_ tab: PanelTab, at index: Int? = nil) {
+        captureActiveTab()
+        let target = min(max(index ?? tabs.count, 0), tabs.count)
+        tabs.insert(tab, at: target)
+        activeTabIndex = target
+        show(tab)
+    }
+
     func selectTab(_ index: Int) {
         guard tabs.indices.contains(index), index != activeTabIndex else { return }
         captureActiveTab()

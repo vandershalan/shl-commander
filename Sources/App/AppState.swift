@@ -70,6 +70,14 @@ final class AppState {
         side == .left ? left : right
     }
 
+    /// Carries a tab from one pane into the other, landing at `index` or at the end. Focus
+    /// follows it, since the tab is where the user's attention went.
+    func transferTab(id: UUID, from side: Side, at index: Int? = nil) {
+        guard let tab = panel(side).removeTab(id: id) else { return }
+        panel(side.other).insertTab(tab, at: index)
+        active = side.other
+    }
+
     var activePanel: PanelViewModel { panel(active) }
     var inactivePanel: PanelViewModel { panel(active.other) }
 

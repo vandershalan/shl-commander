@@ -4,6 +4,7 @@ import SwiftUI
 /// One pane: path bar on top, file table in the middle, tallies at the bottom.
 struct PanelView: View {
     let panel: PanelViewModel
+    let side: AppState.Side
     let volumes: VolumeService
     let cloud: CloudService
     let pathColors: PathColorStore
@@ -19,6 +20,10 @@ struct PanelView: View {
     /// Builds this pane's right-click menu; nil row means the folder itself.
     let onContextMenu: (Int?) -> NSMenu?
     let onActivate: () -> Void
+    /// Tab being dragged in either pane.
+    @Binding var draggedTab: TabDrag?
+    /// Moves a tab from the other pane into this one, at an index or at the end.
+    let onTransferTab: (TabDrag, Int?) -> Void
     /// Every key press goes to `KeyRouter`; the panel itself binds nothing.
     let onKeyDown: (NSEvent) -> Bool
 
@@ -30,13 +35,24 @@ struct PanelView: View {
                 // No divider: the active tab runs straight into the path bar below it.
                 TabStripView(
                     panel: panel,
+                    side: side,
                     colors: pathColors,
                     isActive: isActive,
                     favoriteNames: favoriteNames,
-                    onActivate: onActivate
+                    onActivate: onActivate,
+                    dragging: $draggedTab,
+                    onTransfer: onTransferTab
                 )
             }
             pathBar
+                // A pane with one tab has no strip, so its path bar is where a tab from the
+                // other pane lands.
+                .onDrop(
+                    of: [.text],
+                    delegate: TabDropDelegate(
+                        side: side, panel: panel, index: nil, dragging: $draggedTab,
+                        onTransfer: onTransferTab)
+                )
             Divider()
             FileTableView(
                 entries: panel.entries,

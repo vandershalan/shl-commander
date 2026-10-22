@@ -131,6 +131,57 @@ struct PanelTabTests {
         #expect(panel.tabs[2].title == "beta")
     }
 
+    @Test("dragging a tab reorders the strip and keeps the active tab active")
+    func reorder() async throws {
+        let tree = try TempTree("tab-reorder")
+        defer { tree.remove() }
+        let panel = try await panel(in: tree)
+        panel.openTab(at: tree.root.appendingPathComponent("alpha"))
+        await panel.settle()
+        panel.openTab(at: tree.root.appendingPathComponent("beta"))
+        await panel.settle()
+        let first = panel.tabs[0].id
+
+        panel.moveTab(id: first, to: 2)
+        #expect(panel.tabs.map(\.title) == ["alpha", "beta", tree.root.lastPathComponent])
+        #expect(panel.activeTabIndex == 1, "beta was active and still is")
+        #expect(panel.directory.lastPathComponent == "beta")
+    }
+
+    @Test("a tab carried to the other pane leaves one and opens in the other")
+    func transfer() async throws {
+        let left = try TempTree("tab-transfer-left")
+        let right = try TempTree("tab-transfer-right")
+        defer {
+            left.remove()
+            right.remove()
+        }
+        try left.directory("sub")
+        let state = AppState(
+            left: left.root, right: right.root, keymap: .defaults,
+            settings: isolatedSettings()
+        )
+        await state.left.settle()
+        await state.right.settle()
+        state.left.openTab(at: left.root.appendingPathComponent("sub"))
+        await state.left.settle()
+        let moving = state.left.tabs[1].id
+
+        state.transferTab(id: moving, from: .left)
+        await state.left.settle()
+        await state.right.settle()
+
+        #expect(state.left.tabs.count == 1)
+        #expect(state.left.directory.path == left.root.standardizedFileURL.path)
+        #expect(state.right.tabs.map(\.id).last == moving)
+        #expect(state.right.activeTabIndex == 1)
+        #expect(state.right.directory.lastPathComponent == "sub")
+        #expect(state.active == .right)
+
+        state.transferTab(id: state.left.tabs[0].id, from: .left)
+        #expect(state.left.tabs.count == 1, "the last tab never leaves its pane")
+    }
+
     @Test("navigating updates the active tab's label")
     func navigationUpdatesTab() async throws {
         let tree = try TempTree("tab-navigate")
