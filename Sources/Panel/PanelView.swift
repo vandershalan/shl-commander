@@ -133,7 +133,7 @@ struct PanelView: View {
     private var pathBar: some View {
         HStack(spacing: 6) {
             volumePicker
-            if panel.isInsideArchive {
+            if panel.shownLocation.isInsideArchive {
                 // Marks the pane as looking inside a file rather than at a folder, and says
                 // plainly that nothing here can be written to.
                 Image(systemName: "doc.zipper")
@@ -141,19 +141,19 @@ struct PanelView: View {
                     .foregroundStyle(.secondary)
                     .help(panel.archiveNote ?? "Inside an archive — read-only")
             }
-            Text(panel.displayPath)
+            Text(panel.shownLocation.displayPath)
                 .font(.system(size: scale(12), weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.head)
-                .help(panel.displayPath)
+                .help(panel.shownLocation.displayPath)
             Spacer(minLength: 0)
-            if panel.isLoading {
+            if panel.showsLoading {
                 ProgressView().controlSize(.small)
             }
         }
         .padding(.horizontal, scale(8))
         .frame(height: scale(24))
-        .background(pathColors.barFill(for: panel.directory.path, isActive: isActive))
+        .background(pathColors.barFill(for: panel.shownDirectory.path, isActive: isActive))
     }
 
     /// Total Commander's drive buttons, condensed into one menu per pane — plus the places
@@ -220,7 +220,7 @@ struct PanelView: View {
                 }
             }
         } label: {
-            Text(volumes.volume(containing: panel.directory)?.name ?? "Volume")
+            Text(volumes.volume(containing: panel.shownDirectory)?.name ?? "Volume")
                 .font(.system(size: scale(11)))
         }
         .menuStyle(.borderlessButton)

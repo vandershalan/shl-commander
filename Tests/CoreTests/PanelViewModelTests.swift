@@ -29,6 +29,22 @@ struct PanelViewModelTests {
         #expect(panel.cursor == 0)
     }
 
+    @Test("the path bar moves together with the rows, not ahead of them")
+    func shownLocationTrailsListing() async throws {
+        let tree = try TempTree("shown")
+        defer { tree.remove() }
+        let panel = try await panel(in: tree)
+        let sub = tree.root.appendingPathComponent("sub")
+
+        panel.navigate(to: sub)
+        #expect(panel.shownDirectory.path == tree.root.standardizedFileURL.path)
+        #expect(panel.showsLoading == false)
+
+        await panel.settle()
+        #expect(panel.shownDirectory.path == sub.standardizedFileURL.path)
+        #expect(panel.showsLoading == false)
+    }
+
     @Test("tallies count only real rows and only file bytes")
     func tallies() async throws {
         let tree = try TempTree("tallies")

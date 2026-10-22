@@ -46,13 +46,16 @@ struct TabStripView: View {
         let selected = index == panel.activeTabIndex
         // The selected tab's stored path lags behind navigation until it is captured, so it
         // follows the live directory instead.
-        let path = selected ? panel.directory.path : tab.path
+        let path = selected ? panel.shownDirectory.path : tab.path
+        // Labelled from where the pane shows it is, so the title changes with the rows.
+        var shown = tab
+        if selected { shown.setLocation(panel.shownLocation) }
         let shape = UnevenRoundedRectangle(topLeadingRadius: 5, topTrailingRadius: 5)
 
         // A tap gesture rather than a `Button`: on macOS a button keeps the mouse to itself and
         // a drag never starts.
         return HStack(spacing: 4) {
-            Text(tab.title(favoriteNames: favoriteNames))
+            Text(shown.title(favoriteNames: favoriteNames))
                 .font(.system(size: scale(11), weight: selected ? .semibold : .regular))
                 .lineLimit(1)
                 .foregroundStyle(selected ? .primary : .secondary)

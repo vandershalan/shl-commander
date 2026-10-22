@@ -44,6 +44,20 @@ final class PanelViewModel: Identifiable {
     private(set) var listingID = UUID()
     private(set) var loadError: String?
     private(set) var isLoading = false
+
+    /// Where the pane's chrome — path bar, its colour, the selected tab — says it is.
+    ///
+    /// Trails `location` until the new listing lands, so the path and the rows change in the
+    /// same frame instead of the path first and the rows a beat later. A slow listing is
+    /// revealed after `revealDelay`, together with the spinner, so the bar never claims to be
+    /// somewhere stale for long.
+    private(set) var shownLocation: PanelLocation
+    /// The spinner, held back by the same delay so a quick listing does not flash it.
+    private(set) var showsLoading = false
+    private var revealTask: Task<Void, Never>?
+    private static let revealDelay: Duration = .milliseconds(150)
+
+    var shownDirectory: URL { shownLocation.containingDirectory }
     /// Free space on the volume the panel is on, refreshed with each listing.
     private(set) var freeSpace: Int64?
 
@@ -154,6 +168,7 @@ final class PanelViewModel: Identifiable {
         // Symlinks are deliberately left unresolved: the panel shows the path the user asked
         // for, not wherever it happens to point.
         self.location = .directory(directory.standardizedFileURL)
+        self.shownLocation = .directory(directory.standardizedFileURL)
         self.tabs = [PanelTab(location: .directory(directory.standardizedFileURL))]
         sizer.onUpdate = { [weak self] in self?.directorySizesChanged() }
     }
@@ -736,6 +751,13 @@ final class PanelViewModel: Identifiable {
 
         loadTask?.cancel()
         isLoading = true
+        revealTask?.cancel()
+        revealTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.revealDelay)
+            guard let self, !Task.isCancelled, self.isLoading else { return }
+            self.shownLocation = self.location
+            self.showsLoading = true
+        }
         loadTask = Task { [weak self] in
             let outcome: ListingOutcome
             switch target {
@@ -784,6 +806,10 @@ final class PanelViewModel: Identifiable {
 
     private func apply(_ outcome: ListingOutcome, _ target: CursorTarget) {
         isLoading = false
+        revealTask?.cancel()
+        revealTask = nil
+        showsLoading = false
+        shownLocation = location
         freeSpace = (try? location.containingDirectory
             .resourceValues(forKeys: [.volumeAvailableCapacityKey]))
             .flatMap(\.volumeAvailableCapacity).map(Int64.init)
