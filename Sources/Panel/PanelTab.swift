@@ -72,4 +72,10 @@ struct PanelTab: Codable, Identifiable, Hashable, Sendable {
 
     /// What the tab strip shows.
     var title: String { location.title }
+
+    /// The favourite's name when the tab sits on a bookmarked folder, so a tab opened on
+    /// `com~apple~CloudDocs` reads as whatever the favourite calls it.
+    func title(favoriteNames: [String: String]) -> String {
+        archivePath == nil ? favoriteNames[path] ?? title : title
+    }
 }

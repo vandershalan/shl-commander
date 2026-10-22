@@ -22,6 +22,17 @@ final class FavoritesStore {
         favorites.filter { $0.side == side }
     }
 
+    /// Favourite names keyed by path, for labelling tabs. A folder bookmarked in both panes
+    /// takes the name it has in `side`.
+    func names(preferring side: AppState.Side) -> [String: String] {
+        var names: [String: String] = [:]
+        let ordered = favorites(on: side) + favorites.filter { $0.side != side }
+        for favorite in ordered where names[favorite.path] == nil {
+            names[favorite.path] = favorite.name
+        }
+        return names
+    }
+
     /// Adding a directory already bookmarked for that pane is a no-op, so ⌘⇧D can be pressed
     /// twice safely. The same folder may still be a favourite of both panes.
     @discardableResult

@@ -47,6 +47,27 @@ struct FavoritesStoreTests {
         #expect(added.name == "Work")
     }
 
+    @Test("tab names prefer the pane's own favourite for a shared folder")
+    func namesPreferSide() throws {
+        let tree = try TempTree("fav-names")
+        defer { tree.remove() }
+        let shared = try tree.directory("com~apple~CloudDocs")
+        let other = try tree.directory("Other")
+        let store = store(in: tree)
+        store.add(shared, name: "Right iCloud", side: .right)
+        store.add(shared, name: "iCloud", side: .left)
+        store.add(other, name: "Elsewhere", side: .right)
+
+        let names = store.names(preferring: .left)
+        #expect(names[shared.standardizedFileURL.path] == "iCloud")
+        #expect(names[other.standardizedFileURL.path] == "Elsewhere")
+        #expect(store.names(preferring: .right)[shared.standardizedFileURL.path] == "Right iCloud")
+
+        let tab = PanelTab(url: shared)
+        #expect(tab.title(favoriteNames: names) == "iCloud")
+        #expect(tab.title(favoriteNames: [:]) == "com~apple~CloudDocs")
+    }
+
     @Test("favourites are numbered from one within their group")
     func numbering() throws {
         let tree = try TempTree("fav-number")

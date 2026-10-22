@@ -8,6 +8,8 @@ struct PanelView: View {
     let cloud: CloudService
     let pathColors: PathColorStore
     let isActive: Bool
+    /// Favourite names by path, used as tab titles.
+    let favoriteNames: [String: String]
     /// Files cut to the clipboard, drawn dimmed until they are pasted.
     let cutURLs: Set<URL>
     /// Opens the Connect to Server window, which belongs to no one pane.
@@ -30,6 +32,7 @@ struct PanelView: View {
                     panel: panel,
                     colors: pathColors,
                     isActive: isActive,
+                    favoriteNames: favoriteNames,
                     onActivate: onActivate
                 )
             }

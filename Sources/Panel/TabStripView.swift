@@ -9,6 +9,8 @@ struct TabStripView: View {
     let panel: PanelViewModel
     let colors: PathColorStore
     let isActive: Bool
+    /// Favourite names by path; a tab on a bookmarked folder takes that name.
+    let favoriteNames: [String: String]
     let onActivate: () -> Void
 
     @Environment(\.uiScale) private var scale
@@ -38,7 +40,7 @@ struct TabStripView: View {
             panel.selectTab(index)
         } label: {
             HStack(spacing: 4) {
-                Text(tab.title)
+                Text(tab.title(favoriteNames: favoriteNames))
                     .font(.system(size: scale(11), weight: selected ? .semibold : .regular))
                     .lineLimit(1)
                     .foregroundStyle(selected ? .primary : .secondary)
