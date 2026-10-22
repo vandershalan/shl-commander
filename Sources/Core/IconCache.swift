@@ -9,19 +9,44 @@ final class IconCache {
     static let shared = IconCache()
 
     private var cache: [String: NSImage] = [:]
-    private let side: CGFloat = 16
 
     private init() {}
 
-    func icon(for entry: FileEntry) -> NSImage {
-        let key = Self.key(for: entry)
+    /// `side` is in points; the zoom level decides it, so each size is cached on its own.
+    func icon(for entry: FileEntry, side: CGFloat = 16) -> NSImage {
+        let key = "\(Self.key(for: entry))@\(side)"
         if let hit = cache[key] { return hit }
-        // Copy before resizing: named and symbol images come back shared, and mutating
-        // `size` on those would resize them for the whole process.
-        let image = resolve(entry).copy() as? NSImage ?? resolve(entry)
-        image.size = NSSize(width: side, height: side)
+        let image = Self.rasterize(resolve(entry), side: side)
         cache[key] = image
         return image
+    }
+
+    /// Workspace icons are lazy, multi-resolution images: drawn as they come, every new
+    /// image view decodes the artwork again and converts it to the display's colour space,
+    /// which was the largest single cost of showing a listing. Drawing each icon once into a
+    /// bitmap already in the screen's colour space and pixel format leaves Core Animation
+    /// nothing to do but upload it.
+    private static func rasterize(_ source: NSImage, side: CGFloat) -> NSImage {
+        let screens = NSScreen.screens
+        let backing = screens.map(\.backingScaleFactor).max() ?? 2
+        let pixels = Int((side * backing).rounded(.up))
+        let space =
+            NSScreen.main?.colorSpace?.cgColorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)
+        guard let space,
+            let context = CGContext(
+                data: nil, width: pixels, height: pixels, bitsPerComponent: 8,
+                bytesPerRow: 0, space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+                    | CGBitmapInfo.byteOrder32Little.rawValue)
+        else { return source }
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        source.draw(in: NSRect(x: 0, y: 0, width: pixels, height: pixels))
+        NSGraphicsContext.restoreGraphicsState()
+
+        guard let bitmap = context.makeImage() else { return source }
+        return NSImage(cgImage: bitmap, size: NSSize(width: side, height: side))
     }
 
     private static func key(for entry: FileEntry) -> String {

@@ -234,7 +234,8 @@ final class FileTableController: NSObject, NSTableViewDataSource, NSTableViewDel
 
         switch column {
         case .name:
-            cell.imageView?.image = IconCache.shared.icon(for: entry)
+            cell.imageView?.image = IconCache.shared.icon(
+                for: entry, side: scale(Self.baseIconSize))
             cell.textField?.stringValue = entry.name
         case .ext:
             cell.textField?.stringValue = entry.ext
