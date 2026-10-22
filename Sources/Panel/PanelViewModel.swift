@@ -96,7 +96,7 @@ final class PanelViewModel: Identifiable {
     /// so there is always a way back.
     private(set) var filter: String = "" {
         didSet {
-            guard filter != oldValue else { return }
+            guard filter != oldValue, rebuildsOnFilterChange else { return }
             // Typing follows the cursor down to the first match, so narrowing to a single row
             // leaves Return one keystroke from opening it. An emptied filter is not a request
             // to move anywhere, so the cursor stays on whatever it had reached.
@@ -110,6 +110,10 @@ final class PanelViewModel: Identifiable {
     /// does not silently hand the next Backspace to "go up": deleting your way back to an empty
     /// filter should leave you in the directory, not one level above it.
     private(set) var isFiltering = false
+
+    /// Off while a location change clears the filter. Rebuilding then would put the old
+    /// folder's unfiltered rows on screen until the new listing lands.
+    private var rebuildsOnFilterChange = true
 
     func appendToFilter(_ character: Character) {
         isFiltering = true
@@ -364,7 +368,9 @@ final class PanelViewModel: Identifiable {
         // A change of location ends the filter session outright: the text no longer describes
         // anything on screen.
         isFiltering = false
+        rebuildsOnFilterChange = false
         filter = ""
+        rebuildsOnFilterChange = true
         // Keeps the tab strip's label in step with where the panel actually is.
         if tabs.indices.contains(activeTabIndex) {
             tabs[activeTabIndex].setLocation(target)

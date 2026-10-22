@@ -45,6 +45,23 @@ struct PanelViewModelTests {
         #expect(panel.showsLoading == false)
     }
 
+    @Test("entering a folder from a filtered list does not flash the whole folder first")
+    func filteredNavigationKeepsRowsUntilListing() async throws {
+        let tree = try TempTree("filter-enter")
+        defer { tree.remove() }
+        let panel = try await panel(in: tree)
+        panel.appendToFilter("s")
+        panel.appendToFilter("u")
+        #expect(panel.entries.map(\.name) == ["..", "sub"])
+
+        panel.navigate(to: tree.root.appendingPathComponent("sub"))
+        #expect(panel.entries.map(\.name) == ["..", "sub"], "old rows stay until the new ones")
+        #expect(panel.isFiltering == false)
+
+        await panel.settle()
+        #expect(panel.entries.map(\.name) == [".."])
+    }
+
     @Test("tallies count only real rows and only file bytes")
     func tallies() async throws {
         let tree = try TempTree("tallies")
