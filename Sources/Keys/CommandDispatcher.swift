@@ -174,7 +174,8 @@ struct CommandDispatcher {
             guard let slot = command.favoriteSlot,
                 let favorite = state.favorites.favorite(number: slot.number, on: slot.side)
             else { break }
-            open(favorite)
+            // Same as a click on the bar: a new tab, so the current folder stays a tab away.
+            open(favorite, inNewTab: true)
 
         // Panes
         case .sendPathToOtherPane:
@@ -874,7 +875,7 @@ struct CommandDispatcher {
         state.favoriteMenuTarget.onOpen = { [state] id in
             guard let favorite = state.favorites.favorites.first(where: { $0.id.uuidString == id })
             else { return }
-            CommandDispatcher(state: state).open(favorite)
+            CommandDispatcher(state: state).open(favorite, inNewTab: true)
         }
         let window = NSApp.keyWindow
         let location = NSPoint(x: 20, y: (window?.contentView?.bounds.height ?? 400) - 20)
