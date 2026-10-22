@@ -82,7 +82,7 @@ struct FileTableView: NSViewRepresentable {
         table.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
         table.setDraggingSourceOperationMask([.copy, .move], forLocal: false)
 
-        let scroll = NSScrollView()
+        let scroll = OverlayScrollView()
         scroll.documentView = table
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = false
@@ -172,5 +172,19 @@ struct FileTableView: NSViewRepresentable {
                 controller.beginRename(row: cursor, on: table)
             }
         }
+    }
+}
+
+/// Always uses overlay scrollers, whatever "Show scroll bars" says in System Settings.
+///
+/// A legacy scroller takes its width out of the pane and, with autohiding, only while the
+/// listing overflows — so every move between a short and a long folder shifted the columns
+/// sideways. An overlay scroller floats over the rows and shows itself on scroll or hover.
+/// AppKit resets the style whenever the system preference changes, hence the override
+/// rather than a one-off assignment.
+final class OverlayScrollView: NSScrollView {
+    override var scrollerStyle: NSScroller.Style {
+        get { .overlay }
+        set { super.scrollerStyle = .overlay }
     }
 }
