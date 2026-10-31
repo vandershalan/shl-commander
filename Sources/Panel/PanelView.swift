@@ -145,7 +145,7 @@ struct PanelView: View {
                 .font(.system(size: scale(12), weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.head)
-                .help(panel.shownLocation.displayPath)
+                .help(panel.shownLocation.fullPath)
             Spacer(minLength: 0)
             if panel.showsLoading {
                 ProgressView().controlSize(.small)

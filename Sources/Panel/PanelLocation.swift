@@ -41,6 +41,16 @@ enum PanelLocation: Hashable, Sendable {
     var displayPath: String {
         switch self {
         case .directory(let url):
+            return ICloudDrive.friendlyPath(of: url) ?? url.path
+        case .archive(let archive, let path):
+            return path.isEmpty ? archive.path : archive.path + "/" + path
+        }
+    }
+
+    /// The location's real path, for a tooltip under a `displayPath` that may be friendlier.
+    var fullPath: String {
+        switch self {
+        case .directory(let url):
             return url.path
         case .archive(let archive, let path):
             return path.isEmpty ? archive.path : archive.path + "/" + path
@@ -51,6 +61,7 @@ enum PanelLocation: Hashable, Sendable {
     var title: String {
         switch self {
         case .directory(let url):
+            if let title = ICloudDrive.title(of: url) { return title }
             let name = url.lastPathComponent
             return name.isEmpty || name == "/" ? "Root" : name
         case .archive(let archive, let path):
@@ -96,6 +107,9 @@ enum PanelLocation: Hashable, Sendable {
     var nameWithinParent: String? {
         switch self {
         case .directory(let url):
+            if let container = ICloudDrive.appContainer(of: url) {
+                return ICloudDrive.appName(ofContainer: container)
+            }
             return url.lastPathComponent
         case .archive(let archive, let path):
             let normalised = ArchiveIndex.normalise(path)

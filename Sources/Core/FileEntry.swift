@@ -32,6 +32,10 @@ struct FileEntry: Identifiable, Hashable, Sendable {
     /// Set when this entry is a member of an archive rather than a file on disk. Its `url` is
     /// then synthetic — unique and stable for marks and selection, but not something to stat.
     let archive: ArchiveOrigin?
+    /// An app's folder shown inside iCloud Drive. Its `url` is the app container's `Documents`
+    /// folder and its `name` the app's, so it can be browsed and filled but must not be renamed,
+    /// moved, or deleted — that would act on a folder the app owns, under a different name.
+    let isCloudAppFolder: Bool
 
     init(
         url: URL,
@@ -45,7 +49,8 @@ struct FileEntry: Identifiable, Hashable, Sendable {
         size: Int64,
         modified: Date,
         isParent: Bool,
-        archive: ArchiveOrigin? = nil
+        archive: ArchiveOrigin? = nil,
+        isCloudAppFolder: Bool = false
     ) {
         self.url = url
         self.name = name
@@ -59,6 +64,7 @@ struct FileEntry: Identifiable, Hashable, Sendable {
         self.modified = modified
         self.isParent = isParent
         self.archive = archive
+        self.isCloudAppFolder = isCloudAppFolder
     }
 
     /// Size of something whose container does not record it. Rendered as a dash rather than as

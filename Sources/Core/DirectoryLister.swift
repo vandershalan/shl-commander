@@ -58,8 +58,10 @@ enum DirectoryLister {
     }
 
     /// The parent directory, or nil at a volume root (where `deletingLastPathComponent`
-    /// would just hand back `/` again).
+    /// would just hand back `/` again). An app's folder in iCloud Drive leads back to the
+    /// drive, where it was listed, rather than into the app's container.
     static func parent(of url: URL) -> URL? {
+        if let drive = ICloudDrive.parent(of: url) { return drive }
         let standardized = url.standardizedFileURL
         let up = standardized.deletingLastPathComponent().standardizedFileURL
         guard up.path != standardized.path else { return nil }

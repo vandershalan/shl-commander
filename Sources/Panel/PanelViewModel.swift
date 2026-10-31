@@ -188,6 +188,8 @@ final class PanelViewModel: Identifiable {
     }
 
     /// Shown wherever a write is attempted inside an archive.
+    static let cloudAppFolderMessage =
+        "This folder belongs to an app. It can be opened and filled, but not renamed, moved, or deleted."
     static let readOnlyArchiveMessage = "Archives are read-only. Copy the files out first."
 
     /// Measures the marked directories, or the cursor directory when nothing is marked.
@@ -268,9 +270,13 @@ final class PanelViewModel: Identifiable {
     func dragSources(at row: Int) -> [URL] {
         guard entries.indices.contains(row) else { return [] }
         let entry = entries[row]
-        guard !entry.isParent, !entry.isArchiveMember else { return [] }
+        // An app's iCloud folder would arrive as "Documents", and a drop could move it out of
+        // the container the app reads from.
+        guard !entry.isParent, !entry.isArchiveMember, !entry.isCloudAppFolder else { return [] }
         guard marks.contains(entry.url) else { return [entry.url] }
-        return markedEntries.filter { !$0.isParent && !$0.isArchiveMember }.map(\.url)
+        return markedEntries
+            .filter { !$0.isParent && !$0.isArchiveMember && !$0.isCloudAppFolder }
+            .map(\.url)
     }
 
     /// Where a drop over `row` should land: that row's folder, or the pane's own directory when
@@ -608,6 +614,7 @@ final class PanelViewModel: Identifiable {
         let entry = entries[index]
         guard !entry.isParent else { return nil }
         guard !entry.isArchiveMember else { return Self.readOnlyArchiveMessage }
+        guard !entry.isCloudAppFolder else { return Self.cloudAppFolderMessage }
 
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != entry.name else { return nil }
@@ -783,7 +790,13 @@ final class PanelViewModel: Identifiable {
     /// `nonisolated async` so it runs on the cooperative pool instead of the main actor.
     private nonisolated static func read(_ url: URL, includeHidden: Bool) async -> ListingOutcome {
         do {
-            return .listed(try DirectoryLister.list(url, includeHidden: includeHidden))
+            var entries = try DirectoryLister.list(url, includeHidden: includeHidden)
+            // The drive's own folder holds only what was saved to it directly; the Finder also
+            // shows every app's shared folder there.
+            if ICloudDrive.isRoot(url) {
+                entries += ICloudDrive.appFolders(includeHidden: includeHidden)
+            }
+            return .listed(entries)
         } catch {
             return .failed(error.localizedDescription)
         }

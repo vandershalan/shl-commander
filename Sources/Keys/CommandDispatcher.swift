@@ -54,6 +54,7 @@ struct CommandDispatcher {
                 refuseArchiveWrite()
                 break
             }
+            guard !refuseCloudAppFolders([panel.cursorEntry].compactMap { $0 }) else { break }
             panel.requestRename()
         case .moveToTrash:
             delete(on: panel, toTrash: true)
@@ -235,6 +236,7 @@ struct CommandDispatcher {
             extract(targets, from: archive, on: panel)
             return
         }
+        if kind == .move, refuseCloudAppFolders(targets) { return }
 
         let summary = targets.count == 1
             ? "\u{22}\(targets[0].name)\u{22}"
@@ -351,6 +353,7 @@ struct CommandDispatcher {
         let targets = panel.actionTargets
         guard !targets.isEmpty else { return }
 
+        if cutting, refuseCloudAppFolders(targets) { return }
         guard panel.isInsideArchive else {
             let urls = targets.map(\.url)
             if cutting { state.clipboard.cut(urls) } else { state.clipboard.copy(urls) }
@@ -592,6 +595,17 @@ struct CommandDispatcher {
         }
     }
 
+    /// Reports and returns true when `targets` include an app's iCloud folder, which only looks
+    /// like an ordinary folder: renaming, moving, or deleting it would act on the app's own
+    /// `Documents`.
+    private func refuseCloudAppFolders(_ targets: [FileEntry]) -> Bool {
+        guard let folder = targets.first(where: \.isCloudAppFolder) else { return false }
+        report([
+            OperationFailure(url: folder.url, message: PanelViewModel.cloudAppFolderMessage)
+        ])
+        return true
+    }
+
     private func refuseArchiveWrite() {
         report([
             OperationFailure(
@@ -645,6 +659,7 @@ struct CommandDispatcher {
             refuseArchiveWrite()
             return
         }
+        guard !refuseCloudAppFolders(targets) else { return }
         // Both kinds confirm, listing what is about to go: a mistaken Trash move is
         // recoverable, but only once you work out what disappeared.
         let summary = OperationPrompts.deleteSummary(targets, toTrash: toTrash)
